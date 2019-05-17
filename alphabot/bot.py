@@ -29,6 +29,7 @@ DEFAULT_SCRIPT_DIR = 'default-scripts'
 DEBUG_CHANNEL = os.getenv('DEBUG_CHANNEL', 'alphabot')
 
 WEB_PORT = int(os.getenv('WEB_PORT', 8000))
+WEB_NO_SSL = os.getenv('WEB_NO_SSL', '') != ''
 WEB_PORT_SSL = int(os.getenv('WEB_PORT_SSL', 8443))
 
 log = logging.getLogger(__name__)
@@ -167,10 +168,15 @@ class Bot(object):
             return
         log.info('Listing on port %s' % WEB_PORT)
         self._web_app.listen(WEB_PORT)
-        self._web_app.listen(WEB_PORT_SSL, ssl_options={
-            "certfile": "/tmp/alphabot.pem",  # Generate these in your entrypoint
-            "keyfile": "/tmp/alphabot.key"
-        })
+        if not WEB_NO_SSL:
+            try:
+                self._web_app.listen(WEB_PORT_SSL, ssl_options={
+                    "certfile": "/tmp/alphabot.pem",  # Generate these in your entrypoint
+                    "keyfile": "/tmp/alphabot.key"
+                })
+            except ValueError as e:
+                log.error(e)
+                log.error('Failed to start SSL web app on %s. To disable - set WEB_NO_SSL', WEB_PORT_SSL)
 
     @gen.coroutine
     def add_web_handler(self, path, handler):
@@ -480,6 +486,7 @@ class BotCLI(Bot):
 
     def print_prompt(self):
         print('\033[4mAlphabot\033[0m> ', end='')
+        sys.stdout.flush()
 
     def capture_input(self, fd, events):
         self.input_line = fd.readline().strip()
