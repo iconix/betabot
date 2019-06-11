@@ -1,3 +1,4 @@
+apiai
 apscheduler==3.2.0
 mock
 nose==1.3.7
