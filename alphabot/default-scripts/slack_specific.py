@@ -1,7 +1,6 @@
 import json
 import logging
 
-from tornado import gen
 from tornado import web
 
 import alphabot.bot
@@ -12,8 +11,7 @@ log = logging.getLogger(__name__)
 
 @bot.on(ok=False, error={"code": -1,
                          "msg": "slow down, too many messages..."})
-@gen.coroutine
-def slack_throttle(event):
+async def slack_throttle(event):
     log.warning('Detected a slow-down warning!')
     bot._too_fast_warning = True
 
@@ -50,8 +48,7 @@ class SlackButtonAction(web.RequestHandler):
 
 
 @bot.on_start
-@gen.coroutine
-def add_handlers():
+async def add_handlers():
     """Adds Slack specific handlers to the Bot's web_app."""
     log.info('Adding slack handlers')
     try:

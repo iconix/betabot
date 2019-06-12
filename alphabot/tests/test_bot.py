@@ -38,7 +38,7 @@ class TestBot(testing.AsyncTestCase):
         bot._setup_memory = mock_tornado()
         bot._setup = mock_tornado()
         bot._gather_scripts = mock_tornado()
-        yield bot.setup('unit-memory', 'unit-scripts')
+        await bot.setup('unit-memory', 'unit-scripts')
 
         self.assertEquals(bot._setup_memory.call_count, 1)
 
@@ -69,9 +69,9 @@ class TestBot(testing.AsyncTestCase):
         bot._get_next_event = mock_tornado(
             side_effect=[gen.maybe_future(test_event), TestException])
         try:
-            yield bot.start()
+            await bot.start()
         except TestException:
             pass
 
-        event = yield waiter
+        event = await waiter
         self.assertEquals(event, test_event)

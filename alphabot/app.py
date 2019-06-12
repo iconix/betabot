@@ -14,11 +14,11 @@
 # Copyright 2014 Nextdoor.com, Inc
 
 import argparse
+import asyncio
 import logging
 import os
 import sys
 
-from tornado import ioloop, gen
 import requests
 
 import alphabot.bot
@@ -55,43 +55,31 @@ __author__ = ('Mikhail Simin <mikhail@nextdoor.com>',)
 __version__ = '0.0.1'
 
 
-def start_ioloop():
-    try:
-        ioloop.IOLoop.instance().run_sync(start_alphabot)
-    except KeyboardInterrupt:
-        pass
-    except alphabot.bot.AlphaBotException as e:
-        log.critical('Alphabot failed. Reason: %s' % e)
-
-
-@gen.coroutine
-def start_alphabot():
+async def start_alphabot():
     bot = alphabot.bot.get_instance(engine=args.engine, start_web_app=args.start_web_app)
     memory = args.memory
 
     full_path_scripts = [os.path.abspath(s) for s in args.scripts]
     log.debug('full path scripts: %s' % full_path_scripts)
-    yield bot.setup(memory_type=memory, script_paths=full_path_scripts)
-    yield bot.start()
+    await bot.setup(memory_type=memory, script_paths=full_path_scripts)
+    await bot.start()
+
+
+def start_ioloop():
+    try:
+        loop = asyncio.get_event_loop()
+        asyncio.set_event_loop(loop)
+        loop.set_debug('DEBUG')
+        loop.run_until_complete(start_alphabot())
+    except KeyboardInterrupt:
+        log.info('CTRL-C Caught, shutting down')
+    except alphabot.bot.AlphaBotException as e:
+        log.critical('Alphabot failed. Reason: %s' % e)
+
 
 if __name__ == '__main__':
     if args.version:
         print(__version__)
         exit()
 
-    try:
-        start_ioloop()
-    except KeyboardInterrupt:
-        log.info('CTRL-C Caught, shutting down')
-    except Exception as e:
-        # Skip traceback that involves tornado's libraries.
-        import traceback
-        trace_lines = traceback.format_exc(e).splitlines()
-        skip_next = False
-        for l in trace_lines:
-            if '/tornado/' in l:
-                skip_next = True
-                continue
-            if not skip_next:
-                print(l)
-            skip_next = False
+    start_ioloop()

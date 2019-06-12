@@ -1,8 +1,6 @@
+import json
 import logging
 import os
-import json
-
-from tornado import gen
 
 import redis
 
@@ -12,22 +10,18 @@ log = logging.getLogger(__name__)
 class Memory(object):
     """Memory interface to Alphabot."""
 
-    @gen.coroutine
-    def save(self, key, value):
+    async def save(self, key, value):
         # TODO: Add checks / hashing to prevent bad keys from breaking
-        yield self._save(key, value)
+        await self._save(key, value)
 
-    @gen.coroutine
-    def get(self, key, default=None):
-        value = yield self._get(key, default)
-        raise gen.Return(value)
+    async def get(self, key, default=None):
+        value = await self._get(key, default)
+        return value
 
-    @gen.coroutine
-    def setup(self):
-        yield self._setup()
+    async def setup(self):
+        await self._setup()
 
-    @gen.coroutine
-    def _setup(self):
+    async def _setup(self):
         log.debug('Memory engine %s does not require any setup.' % (
             self.__class__.__name__))
 
@@ -38,13 +32,11 @@ class MemoryDict(Memory):
     def __init__(self):
         self.values = {}
 
-    @gen.coroutine
-    def _save(self, key, value):
+    async def _save(self, key, value):
         self.values[key] = value
 
-    @gen.coroutine
-    def _get(self, key, default):
-        raise gen.Return(self.values.get(key, default))
+    async def _get(self, key, default):
+        return self.values.get(key, default)
 
 
 class MemoryRedis(Memory):
@@ -58,18 +50,16 @@ class MemoryRedis(Memory):
         # Test connection. Raises redis.exceptions.ConnectionError.
         self.r.ping()
 
-    @gen.coroutine
-    def _save(self, key, value):
+    async def _save(self, key, value):
         json_data = json.dumps(value)
         self.r.set(key, json_data)
 
-    @gen.coroutine
-    def _get(self, key, default=None):
+    async def _get(self, key, default=None):
         raw_data = self.r.get(key) or default
         try:
             json_data = json.loads(raw_data)
         except Exception as e:
             log.critical('Could not load json data! %s' % e)
-            raise gen.Return(raw_data)
+            return raw_data
 
-        raise gen.Return(json_data)
+        return json_data

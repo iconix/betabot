@@ -13,8 +13,7 @@ log = logging.getLogger(__name__)
 API_AI_KEY = os.getenv('API_AI_KEY')
 
 
-@gen.coroutine
-def fetch_from_apiai(message):
+async def fetch_from_apiai(message):
     just_text = (
         message.text
                .replace('@%s' % bot._user_name, '')
@@ -38,7 +37,7 @@ def fetch_from_apiai(message):
         log.info('Invoking...')
 
         # import pdb; pdb.set_trace()
-        result = yield function(message)
+        result = await function(message)
 
         log.info('Function returned %s' % result)
 

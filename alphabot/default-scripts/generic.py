@@ -10,19 +10,17 @@ log = logging.getLogger(__name__)
 
 @bot.add_command('!help$')
 @bot.add_help('Get summary of commands', usage='!help')
-@gen.coroutine
-def help(message):
+async def help(message):
     help_text = _make_help_text(bot.help.list())
-    yield message.reply(help_text)
+    await message.reply(help_text)
 
 
 @bot.add_command('!help (.*)')
 @bot.add_help('Get detailed help of a command', usage='!help <command>')
-@gen.coroutine
-def help_query(message):
+async def help_query(message):
     query = message.regex_groups[0]
     help_text = _make_help_text(bot.help.list(query))
-    yield message.reply(help_text)
+    await message.reply(help_text)
 
 
 def _make_help_text(help_list):

@@ -1,26 +1,25 @@
 from __future__ import print_function
 
-try:
-    from StringIO import StringIO
-except ImportError:
-    from io import StringIO
-
+import asyncio
 import json
 import logging
-import mock
 import os
 import pkgutil
 import re
 import sys
 import time
 import traceback
+from io import StringIO
+
+import mock
+
 try:
     from urllib import urlencode
 except ImportError:
     from urllib.parse import urlencode
 
-from apscheduler.schedulers.tornado import TornadoScheduler
-from tornado import websocket, gen, httpclient, ioloop, web
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from tornado import websocket, httpclient, web
 
 from alphabot import help
 from alphabot import memory
@@ -35,7 +34,7 @@ WEB_PORT_SSL = int(os.getenv('WEB_PORT_SSL', 8443))
 log = logging.getLogger(__name__)
 log_level = logging.getLevelName(os.getenv('LOG_LEVEL', 'INFO'))
 log.setLevel(log_level)
-scheduler = TornadoScheduler()
+scheduler = AsyncIOScheduler()
 scheduler.start()
 
 
@@ -124,12 +123,12 @@ class MetaString(str):
 
 class HealthCheck(web.RequestHandler):
     """An endpoint used to check if the app is up."""
+
     def get(self):
         self.write('ok')
 
 
 class Bot(object):
-
     instance = None
     engine = 'default'
 
@@ -178,7 +177,6 @@ class Bot(object):
                 log.error(e)
                 log.error('Failed to start SSL web app on %s. To disable - set WEB_NO_SSL', WEB_PORT_SSL)
 
-    @gen.coroutine
     def add_web_handler(self, path, handler):
         """Adds a Handler to a web app.
 
@@ -194,14 +192,12 @@ class Bot(object):
 
         self._web_app.add_handlers('.*', [(path, handler)])
 
-    @gen.coroutine
-    def setup(self, memory_type, script_paths):
-        yield self._setup_memory(memory_type=memory_type)
-        yield self._setup()  # Engine specific setup
-        yield self._gather_scripts(script_paths)
+    async def setup(self, memory_type, script_paths):
+        await self._setup_memory(memory_type=memory_type)
+        await self._setup()  # Engine specific setup
+        await self._gather_scripts(script_paths)
 
-    @gen.coroutine
-    def _setup_memory(self, memory_type='dict'):
+    async def _setup_memory(self, memory_type='dict'):
 
         # TODO: memory module should provide this mapping.
         memory_map = {
@@ -216,7 +212,7 @@ class Bot(object):
                 'Memory type "%s" is not available.' % memory_type)
 
         self.memory = MemoryClass()
-        yield self.memory.setup()
+        await self.memory.setup()
 
     def load_all_modules_from_dir(self, dirname):
         log.debug('Loading modules from "%s"' % dirname)
@@ -232,13 +228,17 @@ class Bot(object):
                 traceback_string = StringIO()
                 traceback.print_exception(exc_type, exc_value, exc_traceback,
                                           file=traceback_string)
-                self.send(
-                    'Could not load `%s` from %s.' % (package_name, dirname),
-                    DEBUG_CHANNEL)
-                self.send(traceback_string.getvalue(), DEBUG_CHANNEL)
+                asyncio.ensure_future(
+                    self.send(
+                        'Could not load `%s` from %s.' % (package_name, dirname),
+                        DEBUG_CHANNEL)
+                )
 
-    @gen.coroutine
-    def _gather_scripts(self, script_paths=[]):
+                asyncio.ensure_future(
+                    self.send(traceback_string.getvalue(), DEBUG_CHANNEL)
+                )
+
+    async def _gather_scripts(self, script_paths=[]):
         log.info('Gathering scripts...')
         for path in script_paths:
             log.info('Gathering functions from %s' % path)
@@ -257,21 +257,20 @@ class Bot(object):
         log.info('Adding an event on top of the stack: %s' % payload)
         self._web_events.append(payload)
 
-    @gen.coroutine
-    def start(self):
+    async def start(self):
         if self._web_app:
             log.info('Starting web app.')
             self._start_web_app()
 
         log.info('Executing the start scripts.')
-        for function in self._on_start:
-            log.debug('On Start: %s' % function.__name__)
-            yield function()
+        for func in self._on_start:
+            log.debug('On Start: %s' % func.__name__)
+            await func()
 
         log.info('Bot started! Listening to events.')
 
         while True:
-            event = yield self._get_next_event()
+            event = await self._get_next_event()
 
             log.debug('Received event: %s' % event)
             log.debug('Checking against %s listeners' % len(self.event_listeners))
@@ -280,19 +279,20 @@ class Bot(object):
 
             # Note: Copying the event_listeners list here to prevent
             # mid-loop modification of the list.
-            for kwargs, function in list(self.event_listeners):
+            for kwargs, func in list(self.event_listeners):
                 match = self._check_event_kwargs(event, kwargs)
                 log.debug('Function %s requires %s. Match: %s' % (
-                    function.__name__, kwargs, match))
+                    func.__name__, kwargs, match))
                 if match:
                     event_matched = True
                     # XXX Rethink creating a chat object. Only using it for error handling
-                    chat = yield self.event_to_chat(event)
-                    future = function(event=event)
-                    handle_exceptions(future, chat)
+                    chat = await self.event_to_chat(event)
+                    future = func(event=event)
+                    # handle_exceptions(future, chat)
+                    asyncio.ensure_future(future)
 
                 # Figure out why this was added
-                yield gen.moment
+                # await asyncio.sleep(0)
 
             if not event_matched:
                 # Add no-match handler. Mainly for Fallbakc like API.AI
@@ -300,35 +300,32 @@ class Bot(object):
                 # But there should be only one fallback handler
                 pass
 
-    @gen.coroutine
-    def wait_for_event(self, **event_args):
+    async def wait_for_event(self, **event_args):
         # Demented python scope.
         # http://stackoverflow.com/questions/4851463/python-closure-write-to-variable-in-parent-scope
         # This variable could be an object, but instead it's a single-element list.
         event_matched = []
 
-        @gen.coroutine
-        def mark_true(event):
+        async def mark_true(event):
             event_matched.append(event)
 
         log.info('Creating a temporary listener for %s' % (event_args,))
         self.event_listeners.append((event_args, mark_true))
 
         while not event_matched:
-            yield gen.moment
+            await asyncio.sleep(0)
 
         log.info('Deleting the temporary listener for %s' % (event_args,))
         self.event_listeners.remove((event_args, mark_true))
 
-        raise gen.Return(event_matched[0])
+        return event_matched[0]
 
-    def _add_listener(self, chat, **kwargs):
+    def add_listener(self, chat, **kwargs):
         log.info('Adding chat listener...')
 
-        @gen.coroutine
-        def cmd(event):
-            message = yield self.event_to_chat(event)
-            chat.hear(message)
+        async def cmd(event):
+            message = await self.event_to_chat(event)
+            asyncio.ensure_future(chat.hear(message))
 
         # Uniquely identify this `cmd` to delete later.
         cmd._listener_chat_id = id(chat)
@@ -368,6 +365,7 @@ class Bot(object):
 
     def on(self, **kwargs):
         """This decorator will invoke your function with the raw event."""
+
         def decorator(function):
             self._register_function(kwargs, function)
             self._register_api_call(function)
@@ -377,13 +375,13 @@ class Bot(object):
 
     def add_command(self, regex, direct=False):
         """Will convert the raw event into a message object for your function."""
+
         def decorator(function):
             # Register some basic help using the regex.
             self.help.update(function, regex)
 
-            @gen.coroutine
-            def cmd(event):
-                message = yield self.event_to_chat(event)
+            async def cmd(event):
+                message = await self.event_to_chat(event)
                 matches_regex = message.matches_regex(regex)
                 log.debug('Command %s should match the regex %s' % (function.__name__, regex))
                 if not direct and not matches_regex:
@@ -400,7 +398,8 @@ class Bot(object):
                     #             message.matches_regex("^@?%s:?\s" % self._user_id, save=False))
                     if not is_direct:
                         return
-                yield function(message=message, **message.regex_group_dict)
+                await function(message=message, **message.regex_group_dict)
+
             cmd.__name__ = 'wrapped:%s' % function.__name__
 
             self._register_function({'type': 'message'}, cmd)
@@ -413,12 +412,13 @@ class Bot(object):
         def decorator(function):
             self.help.update(function, usage=usage, desc=desc, tags=tags)
             return function
+
         return decorator
 
     def on_schedule(self, **schedule_keywords):
         """Invoke bot command on a schedule.
 
-        Leverages APScheduler for Tornado.
+        Leverages APScheduler for asyncio.
         http://apscheduler.readthedocs.io/en/latest/modules/triggers/cron.html#api
 
         year (int|str) - 4-digit year
@@ -442,21 +442,23 @@ class Bot(object):
         def decorator(function):
             log.info('New Schedule: cron[%s] => %s()' % (schedule_keywords,
                                                          function.__name__))
-            scheduler.add_job(ioloop.IOLoop.instance().add_callback,
-                    'cron', args=[function], **schedule_keywords)
+
+            scheduler.add_job(function, trigger='cron', **schedule_keywords)
             return function
 
         return decorator
 
     # Functions that scripts can tell bot to execute.
 
-    @gen.coroutine
-    def send(self, text, to):
+    async def event_to_chat(self, event):
+        raise CoreException('Chat engine "%s" is missing event_to_chat(...)' % (
+            self.__class__.__name__))
+
+    async def send(self, text, to):
         raise CoreException('Chat engine "%s" is missing send(...)' % (
             self.__class__.__name__))
 
-    @gen.coroutine
-    def _update_channels(self):
+    async def _update_channels(self):
         raise CoreException('Chat engine "%s" is missing _update_channels(...)' % (
             self.__class__.__name__))
 
@@ -471,11 +473,10 @@ class Bot(object):
 
 class BotCLI(Bot):
 
-    @gen.coroutine
-    def _setup(self):
+    async def _setup(self):
         self.print_prompt()
-        ioloop.IOLoop.instance().add_handler(
-            sys.stdin, self.capture_input, ioloop.IOLoop.READ)
+
+        asyncio.ensure_future(self.connect_stdin())
 
         self.input_line = None
         self._user_id = 'U123'
@@ -484,24 +485,31 @@ class BotCLI(Bot):
 
         self.connection = mock.Mock(name='ConnectionObject')
 
+    async def connect_stdin(self):
+        loop = asyncio.get_running_loop()
+        reader = asyncio.StreamReader(loop=loop)
+        reader_protocol = asyncio.StreamReaderProtocol(reader)
+
+        await loop.connect_read_pipe(lambda: reader_protocol, sys.stdin)
+
+        while True:
+            line = (await reader.readline()).rstrip().decode("utf-8")
+            self.input_line = line
+            if self.input_line is None or self.input_line == '':
+                self.input_line = None
+            self.print_prompt()
+
     def print_prompt(self):
         print('\033[4mAlphabot\033[0m> ', end='')
         sys.stdout.flush()
 
-    def capture_input(self, fd, events):
-        self.input_line = fd.readline().strip()
-        if self.input_line is None or self.input_line == '':
-            self.input_line = None
-        self.print_prompt()
-
-    @gen.coroutine
-    def _get_next_event(self):
+    async def _get_next_event(self):
         if len(self._web_events):
             event = self._web_events.pop()
-            raise gen.Return(event)
+            return event
 
         while not self.input_line:
-            yield gen.moment
+            await asyncio.sleep(0.1)  # sleep(0) here eats all cpu
 
         user_input = self.input_line
         self.input_line = None
@@ -509,10 +517,9 @@ class BotCLI(Bot):
         event = {'type': 'message',
                  'text': user_input}
 
-        raise gen.Return(event)
+        return event
 
-    @gen.coroutine
-    def api(self, method, params=None):
+    async def api(self, method, params=None):
         if not params:
             params = {}
         params.update({'token': self._token})
@@ -523,10 +530,9 @@ class BotCLI(Bot):
         response = {
             "ts": time.time()
         }
-        raise gen.Return(response)
+        return response
 
-    @gen.coroutine
-    def event_to_chat(self, event):
+    async def event_to_chat(self, event):
         return Chat(
             text=event['text'],
             user='User',
@@ -534,41 +540,40 @@ class BotCLI(Bot):
             raw=event,
             bot=self)
 
-    @gen.coroutine
-    def send(self, text, to):
+    async def send(self, text, to):
         print('\033[93mAlphabot: \033[92m', text, '\033[0m')
 
     def get_channel(self, name):
         # https://api.slack.com/types/channel
         sample_info = {
-                "id": "C024BE91L",
-                "name": "fun",
-                "is_channel": True,
-                "created": 1360782804,
+            "id": "C024BE91L",
+            "name": "fun",
+            "is_channel": True,
+            "created": 1360782804,
+            "creator": "U024BE7LH",
+            "is_archived": False,
+            "is_general": False,
+
+            "members": [
+                "U024BE7LH",
+            ],
+
+            "topic": {
+                "value": "Fun times",
+                "creator": "U024BE7LV",
+                "last_set": 1369677212
+            },
+            "purpose": {
+                "value": "This channel is for fun",
                 "creator": "U024BE7LH",
-                "is_archived": False,
-                "is_general": False,
+                "last_set": 1360782804
+            },
 
-                "members": [
-                    "U024BE7LH",
-                    ],
+            "is_member": True,
 
-                "topic": {
-                    "value": "Fun times",
-                    "creator": "U024BE7LV",
-                    "last_set": 1369677212
-                    },
-                "purpose": {
-                    "value": "This channel is for fun",
-                    "creator": "U024BE7LH",
-                    "last_set": 1360782804
-                    },
-
-                "is_member": True,
-
-                "last_read": "1401383885.000061",
-                "unread_count": 0,
-                "unread_count_display": 0}
+            "last_read": "1401383885.000061",
+            "unread_count": 0,
+            "unread_count_display": 0}
         return Channel(bot=self, info=sample_info)
 
     def find_channels(self, pattern):
@@ -576,11 +581,10 @@ class BotCLI(Bot):
 
 
 class BotSlack(Bot):
-
     engine = 'slack'
+    _too_fast_warning = False
 
-    @gen.coroutine
-    def _setup(self):
+    async def _setup(self):
         self._token = os.getenv('SLACK_TOKEN')
 
         if not self._token:
@@ -588,7 +592,7 @@ class BotSlack(Bot):
 
         log.info('Authenticating...')
         try:
-            response = yield self.api('rtm.start')
+            response = await self.api('rtm.start')
         except Exception as e:
             raise CoreException('API call "rtm.start" to Slack failed: %s' % e)
 
@@ -600,13 +604,13 @@ class BotSlack(Bot):
             raise InvalidOptions('Login failed')
 
         self.socket_url = response['url']
-        self.connection = yield websocket.websocket_connect(self.socket_url)
+        self.connection = await websocket.websocket_connect(self.socket_url)
 
         self._user_id = response['self']['id']
         self._user_name = response['self']['name']
 
-        yield self._update_channels()
-        yield self._update_users()
+        await self._update_channels()
+        await self._update_users()
 
         self._too_fast_warning = False
 
@@ -618,30 +622,26 @@ class BotSlack(Bot):
         # TODO: handle this better?
         return None
 
-    @gen.coroutine
-    def _update_users(self):
-        response = yield self.api('users.list')
+    async def _update_users(self):
+        response = await self.api('users.list')
         self._users = response['members']
 
-    @gen.coroutine
-    def _update_channels(self):
-        response = yield self.api('channels.list')
+    async def _update_channels(self):
+        response = await self.api('channels.list')
         self._channels = response['channels']
-        response = yield self.api('groups.list')
+        response = await self.api('groups.list')
         self._channels.extend(response['groups'])
 
-    @gen.coroutine
-    def event_to_chat(self, message):
+    async def event_to_chat(self, message):
         channel = self.get_channel(id=message.get('channel'))
         chat = Chat(text=message.get('text'),
                     user=message.get('user'),
                     channel=channel,
                     raw=message,
                     bot=self)
-        raise gen.Return(chat)
+        return chat
 
-    @gen.coroutine
-    def _get_next_event(self):
+    async def _get_next_event(self):
         """Slack-specific message reader.
 
         Returns a web event from the API listener if available, otherwise
@@ -650,19 +650,18 @@ class BotSlack(Bot):
 
         if len(self._web_events):
             event = self._web_events.pop()
-            raise gen.Return(event)
+            return event
 
         # TODO: rewrite this logic to use `on_message` feature of the socket
         # FIXME: At the moment if there are 0 socket messages then web_events
         #        will never be handled.
-        message = yield self.connection.read_message()
+        message = await self.connection.read_message()
         log.debug('Slack message: "%s"' % message)
         message = json.loads(message)
 
-        raise gen.Return(message)
+        return message
 
-    @gen.coroutine
-    def api(self, method, params=None):
+    async def api(self, method, params=None):
         client = httpclient.AsyncHTTPClient()
         if not params:
             params = {}
@@ -670,11 +669,10 @@ class BotSlack(Bot):
         api_url = 'https://slack.com/api/%s' % method
 
         request = '%s?%s' % (api_url, urlencode(params))
-        response = yield client.fetch(request=request)
-        raise gen.Return(json.loads(response.body))
+        response = await client.fetch(request=request)
+        return json.loads(response.body)
 
-    @gen.coroutine
-    def send(self, text, to):
+    async def send(self, text, to):
         payload = json.dumps({
             "id": 1,
             "type": "message",
@@ -683,10 +681,10 @@ class BotSlack(Bot):
         })
         log.debug('Sending payload: %s' % payload)
         if self._too_fast_warning:
-            yield gen.sleep(2)
+            await asyncio.sleep(2)
             self._too_fast_warning = False
-        yield self.connection.write_message(payload)
-        yield gen.sleep(0.1)  # A small sleep here to allow Slack to respond
+        await self.connection.write_message(payload)
+        await asyncio.sleep(0.1)  # A small sleep here to allow Slack to respond
 
     def get_channel(self, **kwargs):
         match = [c for c in self._channels if dict_subset(c, kwargs)]
@@ -709,13 +707,11 @@ class Channel(object):
         self.bot = bot
         self.info = info
 
-    @gen.coroutine
-    def send(self, text):
+    async def send(self, text):
         # TODO: Help make this slack-specfic...
-        yield self.bot.send(text, self.info.get('id'))
+        await self.bot.send(text, self.info.get('id'))
 
-    @gen.coroutine
-    def button_prompt(self, text, buttons):
+    async def button_prompt(self, text, buttons):
         button_actions = []
         for b in buttons:
             if type(b) == dict:
@@ -738,11 +734,11 @@ class Channel(object):
             "attachment_type": "default"
         }
 
-        b = yield self.bot.api('chat.postMessage', {
+        b = await self.bot.api('chat.postMessage', {
             'attachments': json.dumps([attachment]),
             'channel': self.info.get('id')})
 
-        event = yield self.bot.wait_for_event(type='message-action',
+        event = await self.bot.wait_for_event(type='message-action',
                                               callback_id=str(id(self)))
         action_value = MetaString(event['payload']['actions'][0]['value'])
         action_value._meta = {
@@ -754,12 +750,12 @@ class Channel(object):
                                                           action_value)
         attachment['ts'] = time.time()
 
-        yield self.bot.api('chat.update', {
+        await self.bot.api('chat.update', {
             'ts': b['ts'],
             'attachments': json.dumps([attachment]),
             'channel': self.info.get('id')})
 
-        raise gen.Return(action_value)
+        return action_value
 
 
 class User(object):
@@ -786,7 +782,7 @@ class Chat(object):
         self.channel = channel
         self.bot = bot
         self.raw = raw
-        self.listening = False
+        self.listening: str = None
         self.regex_groups = None
         self.regex_group_dict = {}
 
@@ -799,7 +795,7 @@ class Chat(object):
             return False
 
         # Choosing not to ignore case here.
-        match = re.match('^' + regex + '$', self.text)
+        match = re.match(f"^{regex}$", self.text)
         if not match:
             return False
 
@@ -808,41 +804,36 @@ class Chat(object):
             self.regex_group_dict = match.groupdict()
         return True
 
-    @gen.coroutine
-    def reply(self, text):
+    async def reply(self, text):
         """Reply to the original channel of the message."""
         # help hacks
         # help fix direct messages
-        yield self.bot.send(text, to=self.channel.info.get('id'))
+        await self.bot.send(text, to=self.channel.info.get('id'))
 
-    @gen.coroutine
-    def react(self, reaction):
+    async def react(self, reaction):
         # TODO: self.bot.react(reaction, chat=self)
-        yield self.bot.api('reactions.add', {
+        await self.bot.api('reactions.add', {
             'name': reaction,
             'timestamp': self.raw.get('ts'),
             'channel': self.channel.info.get('id')})
 
-    @gen.coroutine
-    def button_prompt(self, text, buttons):
-        action = yield self.channel.button_prompt(text, buttons)
-        raise gen.Return(action)
+    async def button_prompt(self, text, buttons):
+        action = await self.channel.button_prompt(text, buttons)
+        return action
 
     # TODO: Add a timeout here. Don't want to hang forever.
-    @gen.coroutine
-    def listen_for(self, regex):
+    async def listen_for(self, regex: str):
         self.listening = regex
 
         # Hang until self.hear() sets this to False
-        self.bot._add_listener(self)
+        self.bot.add_listener(self)
         while self.listening:
-            yield gen.moment
+            await asyncio.sleep(0)
         self.bot._remove_listener(self)
 
-        raise gen.Return(self.heard_message)
+        return self.heard_message
 
-    @gen.coroutine
-    def hear(self, new_message):
+    async def hear(self, new_message):
         """Invoked by the Bot class to note that `message` was heard."""
 
         # TODO: some flag should control this filter
@@ -852,6 +843,6 @@ class Chat(object):
 
         match = re.match(self.listening, new_message.text)
         if match:
-            self.listening = False
+            self.listening = None
             self.heard_message = new_message
-            raise gen.Return()
+            return
