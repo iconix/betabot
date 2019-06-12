@@ -1,7 +1,5 @@
 import logging
 
-from tornado import gen
-
 import alphabot.bot
 
 bot = alphabot.bot.get_instance()

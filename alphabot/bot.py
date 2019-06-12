@@ -175,7 +175,8 @@ class Bot(object):
                 })
             except ValueError as e:
                 log.error(e)
-                log.error('Failed to start SSL web app on %s. To disable - set WEB_NO_SSL', WEB_PORT_SSL)
+                log.error('Failed to start SSL web app on %s. To disable - set WEB_NO_SSL',
+                          WEB_PORT_SSL)
 
     def add_web_handler(self, path, handler):
         """Adds a Handler to a web app.
@@ -286,7 +287,7 @@ class Bot(object):
                 if match:
                     event_matched = True
                     # XXX Rethink creating a chat object. Only using it for error handling
-                    chat = await self.event_to_chat(event)
+                    # chat = await self.event_to_chat(event)
                     future = func(event=event)
                     # handle_exceptions(future, chat)
                     asyncio.ensure_future(future)
@@ -782,7 +783,7 @@ class Chat(object):
         self.channel = channel
         self.bot = bot
         self.raw = raw
-        self.listening: str = None
+        self.listening = None
         self.regex_groups = None
         self.regex_group_dict = {}
 

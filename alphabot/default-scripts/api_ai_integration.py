@@ -3,7 +3,6 @@ import logging
 import os
 
 import apiai
-from tornado import gen
 
 import alphabot.bot
 
@@ -15,9 +14,7 @@ API_AI_KEY = os.getenv('API_AI_KEY')
 
 async def fetch_from_apiai(message):
     just_text = (
-        message.text
-               .replace('@%s' % bot._user_name, '')
-               .replace('<@%s>' % bot._user_id, '')
+        message.text.replace('@%s' % bot._user_name, '').replace('<@%s>' % bot._user_id, '')
     )
 
     ai = apiai.ApiAI(API_AI_KEY)

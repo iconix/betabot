@@ -1,10 +1,12 @@
-from tornado import testing
-from tornado import gen
+import asyncio
+import logging
+
+import aiounittest
+from aiounittest import mock
 
 from alphabot import bot as AB
 from alphabot.tests.helper import mock_tornado
 
-import logging
 log = logging.getLogger(__name__)
 
 
@@ -12,35 +14,33 @@ class TestException(Exception):
     """Unique exception to be used during testing."""
 
 
-class TestWebApp(testing.AsyncHTTPTestCase):
+class TestWebApp(aiounittest.AsyncTestCase):
     def get_app(self):
         bot = AB.get_instance(start_web_app=True)
         return bot.make_web_app()
 
-    def test_healthz(self):
+    async def _test_healthz(self):
         response = self.fetch('/health_check')
         self.assertEqual(response.code, 200)
         self.assertEqual(response.body.decode(), 'ok')
 
 
-class TestBot(testing.AsyncTestCase):
+class TestBot(aiounittest.AsyncTestCase):
 
-    @testing.gen_test
-    def test_get_instance(self):
+    async def test_get_instance(self):
         bot = AB.get_instance()
         bot2 = AB.get_instance()
 
-        assert(id(bot) == id(bot2))
+        assert (id(bot) == id(bot2))
 
-    @testing.gen_test
-    def test_setup(self):
+    async def test_setup(self):
         bot = AB.Bot()
         bot._setup_memory = mock_tornado()
         bot._setup = mock_tornado()
         bot._gather_scripts = mock_tornado()
         await bot.setup('unit-memory', 'unit-scripts')
 
-        self.assertEquals(bot._setup_memory.call_count, 1)
+        self.assertEqual(bot._setup_memory.call_count, 1)
 
     def test_check_event_kwargs(self):
         bot = AB.Bot()
@@ -60,14 +60,13 @@ class TestBot(testing.AsyncTestCase):
         kwargs = {'test': 'test', 'foobar': ['one', 'two']}
         self.assertFalse(bot._check_event_kwargs(event, kwargs))
 
-    @testing.gen_test
-    def test_wait_event(self):
+    async def _test_wait_event(self):
         bot = AB.Bot()
         test_event = {'unittest': True}
         waiter = bot.wait_for_event(**test_event)
-        bot.event_to_chat = mock_tornado()
+        bot.event_to_chat = mock.AsyncMockIterator(seq=[test_event])
         bot._get_next_event = mock_tornado(
-            side_effect=[gen.maybe_future(test_event), TestException])
+            side_effect=[asyncio.ensure_future(test_event), TestException])
         try:
             await bot.start()
         except TestException:
