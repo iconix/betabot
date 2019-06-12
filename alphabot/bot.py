@@ -292,9 +292,6 @@ class Bot(object):
                     # handle_exceptions(future, chat)
                     asyncio.ensure_future(future)
 
-                # Figure out why this was added
-                # await asyncio.sleep(0)
-
             if not event_matched:
                 # Add no-match handler. Mainly for Fallbakc like API.AI
                 # Maybe add @bot.fallback() ?
@@ -314,7 +311,7 @@ class Bot(object):
         self.event_listeners.append((event_args, mark_true))
 
         while not event_matched:
-            await asyncio.sleep(0)
+            await asyncio.sleep(0.01)
 
         log.info('Deleting the temporary listener for %s' % (event_args,))
         self.event_listeners.remove((event_args, mark_true))
@@ -510,7 +507,7 @@ class BotCLI(Bot):
             return event
 
         while not self.input_line:
-            await asyncio.sleep(0.1)  # sleep(0) here eats all cpu
+            await asyncio.sleep(0.01)  # sleep(0) here eats all cpu
 
         user_input = self.input_line
         self.input_line = None
@@ -829,7 +826,7 @@ class Chat(object):
         # Hang until self.hear() sets this to False
         self.bot.add_listener(self)
         while self.listening:
-            await asyncio.sleep(0)
+            await asyncio.sleep(0.01)
         self.bot._remove_listener(self)
 
         return self.heard_message
