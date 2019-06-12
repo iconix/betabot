@@ -8,7 +8,7 @@ Alpha Bot
 
 Open source python bot to chat with `Slack <https://slack.com/>`_ and, eventually, other platforms.
 
-Inspired by `Hubot <https://hubot.github.com/>`_. Alphabot is written in `Tornado <http://www.tornadoweb.org/en/stable/>`_ combining the power of `Python <https://www.python.org/>`_ with the speed of coroutines.
+Alphabot is written for `Python 3 <https://www.python.org/>`_ leveraging `asyncio` library with `async`/`await` patterns.
 
 Installation
 ============
@@ -17,15 +17,10 @@ Raw:
 
 .. code-block:: bash
 
-    git clone https://github.com/Nextdoor/alphabot.git
+    git clone https://github.com/mikhail/alphabot.git
     cd alphabot
     pip install -e .
     
-Docker:
-
-.. code-block:: bash
-
-    docker run nextdoor/alphabot
 
 Running the bot
 ===============
