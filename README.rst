@@ -3,7 +3,7 @@ Alpha Bot
 ---------
 |pypi_download|_
 
-.. image:: logo.png
+.. image:: images/logo.png
     :align: left
 
 Open source python bot to chat with `Slack <https://slack.com/>`_ and, eventually, other platforms.
@@ -21,6 +21,12 @@ Raw:
     cd alphabot
     pip install -e .
     
+Example
+=======
+Alphabot is optimized for conversation flow:
+
+.. image:: images/example.png
+
 
 Running the bot
 ===============
