@@ -40,7 +40,7 @@ class Help(object):
     def list(self, filter=None):
         results = []
         if filter:
-            for _, help in self._func_map.iteritems():
+            for _, help in self._func_map.items():
                 for tag in help['tags']:
                     if type(tag) is not str:
                         log.warning('Tag %s is not a str' % tag)
@@ -51,6 +51,6 @@ class Help(object):
         else:
             results = [
                     (help['usage'], help['desc'].split("\n")[0])
-                    for _, help in self._func_map.iteritems()]
+                    for _, help in self._func_map.items()]
         # Sort by 'usage' string.
         return sorted(results, key=lambda x: x[0])
