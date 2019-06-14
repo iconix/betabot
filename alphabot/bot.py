@@ -1,5 +1,3 @@
-from __future__ import print_function
-
 import asyncio
 import json
 import logging
@@ -54,7 +52,7 @@ class WebApplicationNotAvailable(AlphaBotException):
     """Failed to register web handler because no web app registered."""
 
 
-def get_instance(engine='cli', start_web_app=False):
+def get_instance(engine='cli', start_web_app=False) -> 'Bot':
     """Get an Alphabot instance.
 
     Args:
@@ -110,11 +108,8 @@ def handle_exceptions(future, chat):
     future.add_done_callback(cb)
 
 
-def dict_subset(big, small):
-    try:
-        return small.viewitems() <= big.viewitems()  # Python 2.7
-    except AttributeError:
-        return small.items() <= big.items()  # Python 3
+def dict_subset(big: dict, small: dict) -> bool:
+    return small.items() <= big.items()  # Python 3
 
 
 class MetaString(str):
@@ -448,7 +443,7 @@ class Bot(object):
 
     # Functions that scripts can tell bot to execute.
 
-    async def event_to_chat(self, event):
+    async def event_to_chat(self, event) -> 'Chat':
         raise CoreException('Chat engine "%s" is missing event_to_chat(...)' % (
             self.__class__.__name__))
 
@@ -460,7 +455,7 @@ class Bot(object):
         raise CoreException('Chat engine "%s" is missing _update_channels(...)' % (
             self.__class__.__name__))
 
-    def get_channel(self, name):
+    def get_channel(self, name) -> 'Channel':
         raise CoreException('Chat engine "%s" is missing get_channel(...)' % (
             self.__class__.__name__))
 
@@ -612,7 +607,7 @@ class BotSlack(Bot):
 
         self._too_fast_warning = False
 
-    def _get_user(self, uid):
+    def _get_user(self, uid) -> 'User':
         match = [u for u in self._users if u['id'] == uid]
         if match:
             return User(match[0])
@@ -701,7 +696,7 @@ class BotSlack(Bot):
 
 class Channel(object):
 
-    def __init__(self, bot, info):
+    def __init__(self, bot: Bot, info):
         self.bot = bot
         self.info = info
 
@@ -709,7 +704,7 @@ class Channel(object):
         # TODO: Help make this slack-specfic...
         await self.bot.send(text, self.info.get('id'))
 
-    async def button_prompt(self, text, buttons):
+    async def button_prompt(self, text, buttons) -> MetaString:
         button_actions = []
         for b in buttons:
             if type(b) == dict:
@@ -816,8 +811,7 @@ class Chat(object):
             'channel': self.channel.info.get('id')})
 
     async def button_prompt(self, text, buttons):
-        action = await self.channel.button_prompt(text, buttons)
-        return action
+        return await self.channel.button_prompt(text, buttons)
 
     # TODO: Add a timeout here. Don't want to hang forever.
     async def listen_for(self, regex: str):
