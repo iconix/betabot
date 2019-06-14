@@ -83,10 +83,10 @@ def handle_exceptions(future, chat):
         log.error('Could not attach callback. Exceptions will be missed.')
         return
 
-    def cb(future):
+    def cb(cbfuture):
         """Custom callback which is chat aware."""
         try:
-            future.result()
+            cbfuture.result()
         except AlphaBotException as e:
             """This exception was raised intentionally. No need for traceback."""
             if chat:
@@ -119,6 +119,9 @@ class MetaString(str):
 class HealthCheck(web.RequestHandler):
     """An endpoint used to check if the app is up."""
 
+    def data_received(self, chunk):
+        pass
+
     def get(self):
         self.write('ok')
 
@@ -128,6 +131,7 @@ class Bot(object):
     engine = 'default'
 
     def __init__(self, start_web_app=False):
+        self.module_path = ''
         self.memory = None
         self.event_listeners = []
         self._web_events = []
@@ -152,12 +156,7 @@ class Bot(object):
         ])
 
     def _start_web_app(self):
-        """Creates a web server on WEB_PORT and WEB_PORT_SSL
-
-        Args:
-            http_port (int): Port to use for HTTP.
-            ssl_port (int): Port to use for HTTPS.
-        """
+        """Creates a web server on WEB_PORT and WEB_PORT_SSL"""
         if not self._web_app:
             return
         log.info('Listing on port %s' % WEB_PORT)
@@ -172,6 +171,9 @@ class Bot(object):
                 log.error(e)
                 log.error('Failed to start SSL web app on %s. To disable - set WEB_NO_SSL',
                           WEB_PORT_SSL)
+
+    def _setup(self):
+        pass
 
     def add_web_handler(self, path, handler):
         """Adds a Handler to a web app.
@@ -202,12 +204,12 @@ class Bot(object):
         }
 
         # Get associated memory class or default to Dict memory type.
-        MemoryClass = memory_map.get(memory_type)
-        if not MemoryClass:
+        memoryclass = memory_map.get(memory_type)
+        if not memoryclass:
             raise InvalidOptions(
                 'Memory type "%s" is not available.' % memory_type)
 
-        self.memory = MemoryClass()
+        self.memory = memoryclass()
         await self.memory.setup()
 
     def load_all_modules_from_dir(self, dirname):
@@ -234,14 +236,15 @@ class Bot(object):
                     self.send(traceback_string.getvalue(), DEBUG_CHANNEL)
                 )
 
-    async def _gather_scripts(self, script_paths=[]):
+    async def _gather_scripts(self, script_paths=None):
         log.info('Gathering scripts...')
-        for path in script_paths:
-            log.info('Gathering functions from %s' % path)
-            self.load_all_modules_from_dir(path)
 
         if not script_paths:
             log.warning('Warning! You did not specify any scripts to load.')
+        else:
+            for path in script_paths:
+                log.info('Gathering functions from %s' % path)
+                self.load_all_modules_from_dir(path)
 
         # TODO: Add a flag to control these
         log.info('Installing default scripts...')
@@ -252,6 +255,9 @@ class Bot(object):
     def _event(self, payload):
         log.info('Adding an event on top of the stack: %s' % payload)
         self._web_events.append(payload)
+
+    async def _get_next_event(self):
+        pass
 
     async def start(self):
         if self._web_app:
@@ -331,10 +337,10 @@ class Bot(object):
     def _remove_listener(self, chat):
         match = None
         # Have to search all the event_listeners here
-        for kw, function in self.event_listeners:
-            if (hasattr(function, '_listener_chat_id') and
-                    function._listener_chat_id == id(chat)):
-                match = (kw, function)
+        for kw, cmd in self.event_listeners:
+            if (hasattr(cmd, '_listener_chat_id') and
+                    cmd._listener_chat_id == id(chat)):
+                match = (kw, cmd)
         self.event_listeners.remove(match)
 
     def _check_event_kwargs(self, event, kwargs):
@@ -343,40 +349,40 @@ class Bot(object):
 
     # Decorators to be used in development of scripts
 
-    def on_start(self, function):
-        self._on_start.append(function)
-        return function
+    def on_start(self, cmd):
+        self._on_start.append(cmd)
+        return cmd
 
-    def _register_function(self, kwargs, function):
-        log.debug('New Listener: %s => %s()' % (kwargs, function.__name__))
-        self.event_listeners.append((kwargs, function))
+    def _register_function(self, kwargs, cmd):
+        log.debug('New Listener: %s => %s()' % (kwargs, cmd.__name__))
+        self.event_listeners.append((kwargs, cmd))
 
-    def _register_api_call(self, function):
-        function_api_name = "alphabot:%s:%s" % (self.module_path, function.__name__)
+    def _register_api_call(self, cmd):
+        function_api_name = "alphabot:%s:%s" % (self.module_path, cmd.__name__)
         log.debug('Registering api: %s' % function_api_name)
-        self._function_map.update({function_api_name: function})
+        self._function_map.update({function_api_name: cmd})
 
     def on(self, **kwargs):
         """This decorator will invoke your function with the raw event."""
 
-        def decorator(function):
-            self._register_function(kwargs, function)
-            self._register_api_call(function)
-            return function
+        def decorator(cmd):
+            self._register_function(kwargs, cmd)
+            self._register_api_call(cmd)
+            return cmd
 
         return decorator
 
     def add_command(self, regex, direct=False):
         """Will convert the raw event into a message object for your function."""
 
-        def decorator(function):
+        def decorator(cmd):
             # Register some basic help using the regex.
-            self.help.update(function, regex)
+            self.help.update(cmd, regex)
 
             async def cmd(event):
                 message = await self.event_to_chat(event)
                 matches_regex = message.matches_regex(regex)
-                log.debug('Command %s should match the regex %s' % (function.__name__, regex))
+                log.debug('Command %s should match the regex %s' % (cmd.__name__, regex))
                 if not direct and not matches_regex:
                     return
 
@@ -391,20 +397,20 @@ class Bot(object):
                     #             message.matches_regex("^@?%s:?\s" % self._user_id, save=False))
                     if not is_direct:
                         return
-                await function(message=message, **message.regex_group_dict)
+                await cmd(message=message, **message.regex_group_dict)
 
-            cmd.__name__ = 'wrapped:%s' % function.__name__
+            cmd.__name__ = 'wrapped:%s' % cmd.__name__
 
             self._register_function({'type': 'message'}, cmd)
-            self._register_api_call(function)
-            return function
+            self._register_api_call(cmd)
+            return cmd
 
         return decorator
 
     def add_help(self, desc=None, usage=None, tags=None):
-        def decorator(function):
-            self.help.update(function, usage=usage, desc=desc, tags=tags)
-            return function
+        def decorator(cmd):
+            self.help.update(cmd, usage=usage, desc=desc, tags=tags)
+            return cmd
 
         return decorator
 
@@ -432,12 +438,12 @@ class Bot(object):
             # Default is every second. We don't want that.
             schedule_keywords['second'] = '0'
 
-        def decorator(function):
+        def decorator(cmd):
             log.info('New Schedule: cron[%s] => %s()' % (schedule_keywords,
-                                                         function.__name__))
+                                                         cmd.__name__))
 
-            scheduler.add_job(function, trigger='cron', **schedule_keywords)
-            return function
+            scheduler.add_job(cmd, trigger='cron', **schedule_keywords)
+            return cmd
 
         return decorator
 
@@ -445,6 +451,10 @@ class Bot(object):
 
     async def event_to_chat(self, event) -> 'Chat':
         raise CoreException('Chat engine "%s" is missing event_to_chat(...)' % (
+            self.__class__.__name__))
+
+    async def api(self, text, to):
+        raise CoreException('Chat engine "%s" is missing api(...)' % (
             self.__class__.__name__))
 
     async def send(self, text, to):
@@ -466,15 +476,18 @@ class Bot(object):
 
 class BotCLI(Bot):
 
-    async def _setup(self):
-        self.print_prompt()
-
-        asyncio.ensure_future(self.connect_stdin())
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
 
         self.input_line = None
         self._user_id = 'U123'
         self._user_name = 'alphabot'
         self._token = ''
+
+    async def _setup(self):
+        self.print_prompt()
+
+        asyncio.ensure_future(self.connect_stdin())
 
         self.connection = mock.Mock(name='ConnectionObject')
 
@@ -611,9 +624,6 @@ class BotSlack(Bot):
         match = [u for u in self._users if u['id'] == uid]
         if match:
             return User(match[0])
-
-        # TODO: handle this better?
-        return None
 
     async def _update_users(self):
         response = await self.api('users.list')
@@ -754,6 +764,8 @@ class Channel(object):
 class User(object):
     """Wrapper for a User with helpful functions."""
 
+    id = ''
+
     def __init__(self, payload):
         assert type(payload) == dict
         self.__dict__ = payload
@@ -776,6 +788,7 @@ class Chat(object):
         self.bot = bot
         self.raw = raw
         self.listening = None
+        self.heard_message = None
         self.regex_groups = None
         self.regex_group_dict = {}
 
