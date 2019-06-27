@@ -375,11 +375,11 @@ class Bot(object):
     def add_command(self, regex, direct=False):
         """Will convert the raw event into a message object for your function."""
 
-        def decorator(cmd):
+        def decorator(cmd: 'function'):
             # Register some basic help using the regex.
             self.help.update(cmd, regex)
 
-            async def cmd(event):
+            async def wrapper(event):
                 message = await self.event_to_chat(event)
                 matches_regex = message.matches_regex(regex)
                 log.debug('Command %s should match the regex %s' % (cmd.__name__, regex))
@@ -399,9 +399,9 @@ class Bot(object):
                         return
                 await cmd(message=message, **message.regex_group_dict)
 
-            cmd.__name__ = 'wrapped:%s' % cmd.__name__
+            wrapper.__name__ = 'wrapped:%s' % cmd.__name__
 
-            self._register_function({'type': 'message'}, cmd)
+            self._register_function({'type': 'message'}, wrapper)
             self._register_api_call(cmd)
             return cmd
 
