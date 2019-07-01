@@ -3,6 +3,7 @@ import json
 import logging
 import os
 import pkgutil
+import random
 import re
 import sys
 import time
@@ -457,7 +458,7 @@ class Bot(object):
         raise CoreException('Chat engine "%s" is missing api(...)' % (
             self.__class__.__name__))
 
-    async def send(self, text, to):
+    async def send(self, text, to, extra=None) -> 'Chat':
         raise CoreException('Chat engine "%s" is missing send(...)' % (
             self.__class__.__name__))
 
@@ -483,6 +484,7 @@ class BotCLI(Bot):
         self._user_id = 'U123'
         self._user_name = 'alphabot'
         self._token = ''
+        self._cli_channel = Channel(self, {'id': 'CLI'})
 
     async def _setup(self):
         self.print_prompt()
@@ -542,12 +544,13 @@ class BotCLI(Bot):
         return Chat(
             text=event['text'],
             user='User',
-            channel=Channel(self, {'id': 'CLI'}),
+            channel=self._cli_channel,
             raw=event,
             bot=self)
 
-    async def send(self, text, to):
+    async def send(self, text, to, extra=None):
         print('\033[93mAlphabot: \033[92m', text, '\033[0m')
+        return await self.event_to_chat({'text': text})
 
     def get_channel(self, name):
         # https://api.slack.com/types/channel
@@ -675,19 +678,23 @@ class BotSlack(Bot):
         response = await client.fetch(request=request)
         return json.loads(response.body)
 
-    async def send(self, text, to):
-        payload = json.dumps({
-            "id": 1,
-            "type": "message",
-            "channel": to,
-            "text": text
-        })
-        log.debug('Sending payload: %s' % payload)
+    async def send(self, text, to, extra=None):
+        if extra is None:
+            extra = {}
+        id = random.randint(1000, 10000)
+        payload = {"id": id, "type": "message", "channel": to, "text": text}
+        payload.update(extra)
         if self._too_fast_warning:
             await asyncio.sleep(2)
             self._too_fast_warning = False
-        await self.connection.write_message(payload)
-        await asyncio.sleep(0.1)  # A small sleep here to allow Slack to respond
+        await self.connection.write_message(json.dumps(payload))
+
+        confirmation_event = await self.wait_for_event(reply_to=id)
+        confirmation_event.update({
+            'channel': to,
+            'user': self._user_id
+        })
+        return await self.event_to_chat(confirmation_event)
 
     def get_channel(self, **kwargs):
         match = [c for c in self._channels if dict_subset(c, kwargs)]
@@ -710,9 +717,9 @@ class Channel(object):
         self.bot = bot
         self.info = info
 
-    async def send(self, text):
+    async def send(self, text, extra=None):
         # TODO: Help make this slack-specfic...
-        await self.bot.send(text, self.info.get('id'))
+        return await self.bot.send(text, self.info.get('id'), extra)
 
     async def button_prompt(self, text, buttons) -> MetaString:
         button_actions = []
@@ -781,7 +788,7 @@ class Chat(object):
     This gets passed to the receiving script's function.
     """
 
-    def __init__(self, text, user, channel, raw, bot):
+    def __init__(self, text: str, user: str, channel: Channel, raw: dict, bot: Bot):
         self.text = text
         self.user = user  # TODO: Create a User() object
         self.channel = channel
@@ -814,7 +821,12 @@ class Chat(object):
         """Reply to the original channel of the message."""
         # help hacks
         # help fix direct messages
-        await self.bot.send(text, to=self.channel.info.get('id'))
+        return await self.bot.send(text, to=self.channel.info.get('id'))
+
+    async def reply_thread(self, text):
+        """Reply to the original channel of the message in a thread."""
+        return await self.bot.send(text, to=self.channel.info.get('id'),
+                                   extra={'thread_ts': self.raw.get('ts')})
 
     async def react(self, reaction):
         # TODO: self.bot.react(reaction, chat=self)
