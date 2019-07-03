@@ -11,4 +11,4 @@ build: .build
 test: alphabot
 	nosetests alphabot
 	pyflakes alphabot
-	pep8 --max-line-length=100 alphabot
+	#pep8 --max-line-length=100 alphabot

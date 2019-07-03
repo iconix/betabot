@@ -1,3 +1,10 @@
+import sys
+import time
+
+import mock
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from tornado import websocket, httpclient, web
+
 import asyncio
 import json
 import logging
@@ -5,23 +12,11 @@ import os
 import pkgutil
 import random
 import re
-import sys
-import time
 import traceback
-from io import StringIO
-
-import mock
-
-try:
-    from urllib import urlencode
-except ImportError:
-    from urllib.parse import urlencode
-
-from apscheduler.schedulers.asyncio import AsyncIOScheduler
-from tornado import websocket, httpclient, web
-
 from alphabot import help
 from alphabot import memory
+from io import StringIO
+from urllib.parse import urlencode
 
 DEFAULT_SCRIPT_DIR = 'default-scripts'
 DEBUG_CHANNEL = os.getenv('DEBUG_CHANNEL', 'alphabot')
@@ -133,10 +128,13 @@ class Bot(object):
 
     def __init__(self, start_web_app=False):
         self.module_path = ''
-        self.memory = None
+        self.memory: memory.Memory = None
         self.event_listeners = []
         self._web_events = []
         self._on_start = []
+
+        self._user_id = ''
+        self._user_name = ''
 
         self.help = help.Help()
         self._function_map = {}
@@ -376,7 +374,7 @@ class Bot(object):
     def add_command(self, regex, direct=False):
         """Will convert the raw event into a message object for your function."""
 
-        def decorator(cmd: 'function'):
+        def decorator(cmd):
             # Register some basic help using the regex.
             self.help.update(cmd, regex)
 
@@ -387,17 +385,9 @@ class Bot(object):
                 if not direct and not matches_regex:
                     return
 
-                if direct:
-                    # TODO maybe make it better...
-                    # TODO definitely refactor this garbage: message.is_direct()
-                    # or better yet: message.matches(regex, direct)
-                    # Here's how Hubot did it:
-                    # https://github.com/github/hubot/blob/master/src/robot.coffee#L116
-                    is_direct = False
-                    # is_direct = (message.channel.startswith('D') or
-                    #             message.matches_regex("^@?%s:?\s" % self._user_id, save=False))
-                    if not is_direct:
-                        return
+                if direct and not message.is_direct:
+                    return
+
                 await cmd(message=message, **message.regex_group_dict)
 
             wrapper.__name__ = 'wrapped:%s' % cmd.__name__
@@ -540,7 +530,7 @@ class BotCLI(Bot):
         }
         return response
 
-    async def event_to_chat(self, event):
+    async def event_to_chat(self, event) -> 'Chat':
         return Chat(
             text=event['text'],
             user='User',
@@ -550,6 +540,7 @@ class BotCLI(Bot):
 
     async def send(self, text, to, extra=None):
         print('\033[93mAlphabot: \033[92m', text, '\033[0m')
+        await asyncio.sleep(0.01)  # Avoid BlockingIOError due to sync print above.
         return await self.event_to_chat({'text': text})
 
     def get_channel(self, name):
@@ -794,8 +785,12 @@ class Chat(object):
         self.channel = channel
         self.bot = bot
         self.raw = raw
+
+        self.is_direct = False
+
         self.listening = None
         self.heard_message = None
+
         self.regex_groups = None
         self.regex_group_dict = {}
 
@@ -807,9 +802,22 @@ class Chat(object):
         if not self.text:
             return False
 
-        # Choosing not to ignore case here.
-        match = re.match(f"^{regex}$", self.text)
+        is_private_message = self.channel.info.get('id').startswith('D')
+        if is_private_message:
+            self.is_direct = True
+
+        regex_name = f'^[\\s@<]*(?:{self.bot._user_name}|{self.bot._user_id})[>:,\\s]*'
+
+        flags = re.IGNORECASE
+
+        match = re.match(f"^{regex}$", self.text, flags)
         if not match:
+            starts_with_name = re.match(regex_name, self.text, flags)
+            if starts_with_name:
+                self.text = re.sub(regex_name, '', self.text, flags=flags)
+                self.is_direct = True
+                return self.matches_regex(regex, save)
+
             return False
 
         if save:
