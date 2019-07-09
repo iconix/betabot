@@ -5,13 +5,13 @@ DIR = os.path.dirname(os.path.realpath(__file__))
 
 setup(
     name = "alphabot",
-    version = "0.0.0",
+    version = "0.0.1",
     author = "Mikhail Simin",
     author_email = "mikhail.simin@gmail.com",
     description = ("Bot that connects to Slack."),
     license = "Apache License, Version 2.0",
     keywords = "slack, chat, irc, hubot",
-    url = "https://github.com/Nextdoor/alphabot",
+    url = "https://github.com/mikhail/alphabot",
     packages=find_packages(),
     long_description=open('%s/README.rst' % DIR).read(),
     install_requires=open('%s/requirements.txt' % DIR).readlines(),
