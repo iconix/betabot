@@ -5,7 +5,7 @@ Alphabot
 
 
 ==========================  =====
-.. image:: images/logo.png  - Open source python bot to chat with `Slack <https://slack.com/>`_ and, eventually, other platforms.
+.. image:: images/logo.png  - Open source python bot to chat with `Slack <https://slack.com/>`_ and eventually other platforms like MS Teams.
                             - Alphabot is written for `Python 3 <https://www.python.org/>`_ leveraging ``asyncio`` library with ``async``/``await`` patterns.               
 ==========================  =====
 
