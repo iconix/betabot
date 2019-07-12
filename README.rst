@@ -1,5 +1,5 @@
 
-Alpha Bot
+Alphabot
 ---------
 |pypi_download|_
 
