@@ -7,15 +7,26 @@ log = logging.getLogger(__name__)
 
 
 @bot.add_command('!help$')
-@bot.add_help('Get summary of commands', usage='!help')
+@bot.learn([
+    'List your commands',
+    'What can you do?',
+    'What commands do you know?',
+    'help'])
 async def help(message):
+    """Get summary of all commands
+
+    Usage: !help
+    """
     help_text = _make_help_text(bot.help.list())
     await message.reply(help_text)
 
 
 @bot.add_command('!help (.*)')
-@bot.add_help('Get detailed help of a command', usage='!help <command>')
 async def help_query(message):
+    """Get detailed help of a command
+
+    Usage: !help <command>
+    """
     query = message.regex_groups[0]
     help_text = _make_help_text(bot.help.list(query))
     await message.reply(help_text)

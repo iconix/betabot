@@ -8,4 +8,5 @@ pyflakes
 pytz
 redis
 requests
+textblob
 tornado

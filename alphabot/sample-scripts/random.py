@@ -52,6 +52,10 @@ async def conversation(message):
 
 
 @bot.add_command('random number')
+@bot.learn(
+    ['Give me a random number',
+     'roll the dice',
+     'generatet a random number'])
 async def random_number(message):
     last_r = await bot.memory.get('random_number')
     r = random.randint(1, 10)

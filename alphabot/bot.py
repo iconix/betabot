@@ -1,22 +1,24 @@
 import sys
 import time
 
-import mock
-from apscheduler.schedulers.asyncio import AsyncIOScheduler
-from tornado import websocket, httpclient, web
-
 import asyncio
 import json
 import logging
+import mock
 import os
 import pkgutil
 import random
 import re
 import traceback
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from io import StringIO
+from textblob.classifiers import NaiveBayesClassifier
+from tornado import websocket, httpclient, web
+from typing import List, Dict, Tuple
+from urllib.parse import urlencode
+
 from alphabot import help
 from alphabot import memory
-from io import StringIO
-from urllib.parse import urlencode
 
 DEFAULT_SCRIPT_DIR = 'default-scripts'
 DEBUG_CHANNEL = os.getenv('DEBUG_CHANNEL', 'alphabot')
@@ -137,7 +139,11 @@ class Bot(object):
         self._user_name = ''
 
         self.help = help.Help()
-        self._function_map = {}
+        self._function_map: Dict[str, 'function'] = {}  # maps command to function
+
+        self._learn_map: List[Tuple[List[str], 'function']] = []  # saves all sentences to learn for a function
+        self._classifier: NaiveBayesClassifier = None
+
         self._web_app = None
         if start_web_app:
             self._web_app = self.make_web_app()
@@ -276,7 +282,21 @@ class Bot(object):
             log.debug('Received event: %s' % event)
             log.debug('Checking against %s listeners' % len(self.event_listeners))
 
-            event_matched = False
+            if event['text']:
+                if not self._classifier:
+                    learn_map = []
+                    for l in self._learn_map:
+                        learn_map.extend([ (k, l[1]) for k in l[0] ])
+                    self._classifier = NaiveBayesClassifier(learn_map)
+
+                choices = self._classifier.prob_classify(event['text'])
+                func = choices.max()
+                prob = choices.prob(func)
+                log.debug(f'NLTK matched `{func.__name__}` function at {int(prob * 100)}%')
+                if prob > 0.95:
+                    message = await self.event_to_chat(event)
+                    asyncio.ensure_future( func(message) )
+                    continue  # Do not loop through event listeners!
 
             # Note: Copying the event_listeners list here to prevent
             # mid-loop modification of the list.
@@ -285,18 +305,10 @@ class Bot(object):
                 log.debug('Function %s requires %s. Match: %s' % (
                     func.__name__, kwargs, match))
                 if match:
-                    event_matched = True
-                    # XXX Rethink creating a chat object. Only using it for error handling
-                    # chat = await self.event_to_chat(event)
                     future = func(event=event)
-                    # handle_exceptions(future, chat)
                     asyncio.ensure_future(future)
-
-            if not event_matched:
-                # Add no-match handler. Mainly for Fallbakc like API.AI
-                # Maybe add @bot.fallback() ?
-                # But there should be only one fallback handler
-                pass
+                    # TODO: add a way to detect if any of these were "REAL" Match
+                    #       then execute the NLP part if none matched.
 
     async def wait_for_event(self, **event_args):
         # Demented python scope.
@@ -394,6 +406,18 @@ class Bot(object):
 
             self._register_function({'type': 'message'}, wrapper)
             self._register_api_call(cmd)
+            return cmd
+
+        return decorator
+
+    def learn(self, sentences: List[str], direct=False):
+        """Learn sentences for a command.
+        :param sentences: list of strings -
+        :param direct:
+        :return:
+        """
+        def decorator(cmd):
+            self._learn_map.append((sentences, cmd))
             return cmd
 
         return decorator
