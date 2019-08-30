@@ -323,7 +323,7 @@ class Bot(object):
         self.event_listeners.append((event_args, mark_true))
 
         while not event_matched:
-            await asyncio.sleep(0.01)
+            await asyncio.sleep(0.001)
 
         log.info('Deleting the temporary listener for %s' % (event_args,))
         self.event_listeners.remove((event_args, mark_true))
@@ -519,10 +519,11 @@ class BotCLI(Bot):
             self.input_line = line
             if self.input_line is None or self.input_line == '':
                 self.input_line = None
+            await asyncio.sleep(0.1)
+            asyncio.ensure_future(self.print_prompt())
 
     async def print_prompt(self):
         print('\033[4mAlphabot\033[0m> ', end='')
-        await asyncio.sleep(0)
         sys.stdout.flush()
 
     async def _get_next_event(self):
@@ -531,7 +532,7 @@ class BotCLI(Bot):
             return event
 
         while not self.input_line:
-            await asyncio.sleep(0.01)  # sleep(0) here eats all cpu
+            await asyncio.sleep(0.001)  # sleep(0) here eats all cpu
 
         user_input = self.input_line
         self.input_line = None
@@ -564,8 +565,8 @@ class BotCLI(Bot):
 
     async def send(self, text, to, extra=None):
         print('\033[93mAlphabot: \033[92m', text, '\033[0m')
+        sys.stdout.flush()
         await asyncio.sleep(0.01)  # Avoid BlockingIOError due to sync print above.
-        await self.print_prompt()
         return await self.event_to_chat({'text': text})
 
     def get_channel(self, name):

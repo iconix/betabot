@@ -50,8 +50,8 @@ async def help_query(message):
     await message.reply(help_text)
 
 
-@bot.add_command('uptime')
-@bot.learn(['How long have you been running?', "What's your uptime?"])
+@bot.add_command('uptime', direct=True)
+@bot.learn(["What's your uptime?", 'How long have you been running?'])
 async def get_uptime(message):
     """Get amount of time this bot has been running
 
