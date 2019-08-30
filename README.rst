@@ -23,9 +23,16 @@ Installation
     
 Example
 =======
-Alphabot is optimized for conversation flow:
+Alphabot has some support for conversation flow:
+
+Slack
+----
 
 .. image:: images/example.png
+
+CLI
+----
+.. image:: images/example_cli.png
 
 
 Running the bot
