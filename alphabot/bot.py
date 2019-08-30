@@ -394,11 +394,13 @@ class Bot(object):
                 message = await self.event_to_chat(event)
                 matches_regex = message.matches_regex(regex)
                 log.debug('Command %s should match the regex %s' % (cmd.__name__, regex))
-                if not direct and not matches_regex:
+                if not matches_regex:
                     return
 
                 if direct and not message.is_direct:
                     return
+
+                log.debug(f"Executing {cmd.__name__}")
 
                 await cmd(message=message, **message.regex_group_dict)
 
@@ -501,11 +503,9 @@ class BotCLI(Bot):
         self._cli_channel = Channel(self, {'id': 'CLI'})
 
     async def _setup(self):
-        self.print_prompt()
-
         asyncio.ensure_future(self.connect_stdin())
-
         self.connection = mock.Mock(name='ConnectionObject')
+        asyncio.ensure_future(self.print_prompt())
 
     async def connect_stdin(self):
         loop = asyncio.get_running_loop()
@@ -519,10 +519,10 @@ class BotCLI(Bot):
             self.input_line = line
             if self.input_line is None or self.input_line == '':
                 self.input_line = None
-            self.print_prompt()
 
-    def print_prompt(self):
+    async def print_prompt(self):
         print('\033[4mAlphabot\033[0m> ', end='')
+        await asyncio.sleep(0)
         sys.stdout.flush()
 
     async def _get_next_event(self):
@@ -565,6 +565,7 @@ class BotCLI(Bot):
     async def send(self, text, to, extra=None):
         print('\033[93mAlphabot: \033[92m', text, '\033[0m')
         await asyncio.sleep(0.01)  # Avoid BlockingIOError due to sync print above.
+        await self.print_prompt()
         return await self.event_to_chat({'text': text})
 
     def get_channel(self, name):
@@ -847,6 +848,7 @@ class Chat(object):
         if save:
             self.regex_groups = match.groups()
             self.regex_group_dict = match.groupdict()
+        log.debug(f"Chat matched regex: {self.text} matched {regex}")
         return True
 
     async def reply(self, text):
