@@ -1,24 +1,24 @@
 import sys
 import time
 
+import mock
+from alphabot import help
+from alphabot import memory
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from textblob.classifiers import NaiveBayesClassifier
+from tornado import websocket, httpclient, web
+
 import asyncio
 import json
 import logging
-import mock
 import os
 import pkgutil
 import random
 import re
 import traceback
-from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from io import StringIO
-from textblob.classifiers import NaiveBayesClassifier
-from tornado import websocket, httpclient, web
 from typing import List, Dict, Tuple
 from urllib.parse import urlencode
-
-from alphabot import help
-from alphabot import memory
 
 DEFAULT_SCRIPT_DIR = 'default-scripts'
 DEBUG_CHANNEL = os.getenv('DEBUG_CHANNEL', 'alphabot')
@@ -139,7 +139,6 @@ class Bot(object):
         self._user_name = ''
 
         self.help = help.Help()
-        self._function_map: Dict[str, 'function'] = {}  # maps command to function
 
         self._learn_map: List[Tuple[List[str], 'function']] = []  # saves all sentences to learn for a function
         self._classifier: NaiveBayesClassifier = None
@@ -286,16 +285,17 @@ class Bot(object):
                 if not self._classifier:
                     learn_map = []
                     for l in self._learn_map:
-                        learn_map.extend([ (k, l[1]) for k in l[0] ])
+                        learn_map.extend([(k, l[1]) for k in l[0]])
                     self._classifier = NaiveBayesClassifier(learn_map)
 
                 choices = self._classifier.prob_classify(event['text'])
                 func = choices.max()
                 prob = choices.prob(func)
                 log.debug(f'NLTK matched `{func.__name__}` function at {int(prob * 100)}%')
-                if prob > 0.95:
-                    message = await self.event_to_chat(event)
-                    asyncio.ensure_future( func(message) )
+                message = await self.event_to_chat(event)
+                min_prob = 0.65 if message.is_direct else 0.95
+                if prob > min_prob:
+                    asyncio.ensure_future(func(message))
                     continue  # Do not loop through event listeners!
 
             # Note: Copying the event_listeners list here to prevent
@@ -368,17 +368,11 @@ class Bot(object):
         log.debug('New Listener: %s => %s()' % (kwargs, cmd.__name__))
         self.event_listeners.append((kwargs, cmd))
 
-    def _register_api_call(self, cmd):
-        function_api_name = "alphabot:%s:%s" % (self.module_path, cmd.__name__)
-        log.debug('Registering api: %s' % function_api_name)
-        self._function_map.update({function_api_name: cmd})
-
     def on(self, **kwargs):
         """This decorator will invoke your function with the raw event."""
 
         def decorator(cmd):
             self._register_function(kwargs, cmd)
-            self._register_api_call(cmd)
             return cmd
 
         return decorator
@@ -395,19 +389,19 @@ class Bot(object):
                 matches_regex = message.matches_regex(regex)
                 log.debug('Command %s should match the regex %s' % (cmd.__name__, regex))
                 if not matches_regex:
-                    return
+                    return False
 
                 if direct and not message.is_direct:
-                    return
+                    return False
 
                 log.debug(f"Executing {cmd.__name__}")
 
                 await cmd(message=message, **message.regex_group_dict)
+                return True
 
             wrapper.__name__ = 'wrapped:%s' % cmd.__name__
 
             self._register_function({'type': 'message'}, wrapper)
-            self._register_api_call(cmd)
             return cmd
 
         return decorator
@@ -418,6 +412,7 @@ class Bot(object):
         :param direct:
         :return:
         """
+
         def decorator(cmd):
             self._learn_map.append((sentences, cmd))
             return cmd
@@ -821,7 +816,7 @@ class Chat(object):
         self.regex_group_dict = {}
 
     def matches_regex(self, regex, save=True):
-        """Check if this message matches the regex.
+        """Check if this message matches the regex with or without direct mention.
 
         If it does store the groups for later use.
         """
@@ -832,12 +827,12 @@ class Chat(object):
         if is_private_message:
             self.is_direct = True
 
-        regex_name = f'^[\\s@<]*(?:{self.bot._user_name}|{self.bot._user_id})[>:,\\s]*'
-
         flags = re.IGNORECASE
 
         match = re.match(f"^{regex}$", self.text, flags)
         if not match:
+            regex_name = f'^[\\s@<]*(?:{self.bot._user_name}|{self.bot._user_id})[>:,\\s]*'
+
             starts_with_name = re.match(regex_name, self.text, flags)
             if starts_with_name:
                 self.text = re.sub(regex_name, '', self.text, flags=flags)
