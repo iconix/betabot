@@ -4,8 +4,8 @@ import logging
 import aiounittest
 from aiounittest import mock
 
-from alphabot import bot as AB
-from alphabot.tests.helper import mock_tornado
+from betabot import bot as AB
+from betabot.tests.helper import mock_tornado
 
 log = logging.getLogger(__name__)
 

@@ -1,7 +1,7 @@
 import mock
 from tornado import gen
 
-__author__ = 'Mikhail Simin <mikhail@nextdoor.com>'
+__author__ = 'Nadja Rhodes <narhodes1+blog@gmail.com>'
 
 
 def mock_tornado(*args, **kwargs):

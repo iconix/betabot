@@ -2,17 +2,17 @@ import asyncio
 import logging
 import random
 
-import alphabot.bot
+import betabot.bots.bot
 
 # Actual bot instance. Will be available because this file should only be
 # invoked inside of a script-discovery code of the bot itself!
-bot = alphabot.bot.get_instance()
+bot = betabot.bots.bot.get_instance()
 log = logging.getLogger(__name__)
 
 
 @bot.on_schedule(minute='0')
 async def still_here():
-    channel = bot.get_channel(name='alphabot-debug')
+    channel = bot.get_channel(name='betabot-debug')
     if channel:
         await channel.send('I am still here!')
 
@@ -30,7 +30,7 @@ async def button_example(message):
 async def acknowledge(event):
     message = bot.event_to_chat(event)
     await message.reply('Tadaa!')
-    log.info('Attached to a message!')
+    log.debug('Attached to a message!')
 
 
 @bot.add_command('lunch')
@@ -43,8 +43,8 @@ async def lunch_suggestion(message):
 
 @bot.add_command('hi')
 async def conversation(message):
-    log.info('Starting a conversation')
-    await message.reply("How are you?")
+    log.debug('Starting a conversation')
+    await message.reply("Hi! How are you?")
 
     response = await message.listen_for('(.*)')
 

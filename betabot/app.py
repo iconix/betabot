@@ -17,11 +17,12 @@ import argparse
 import asyncio
 import logging
 import os
+import signal
 import sys
 
 import requests
 
-import alphabot.bot
+import betabot.bots.bot
 
 requests.packages.urllib3.disable_warnings()
 
@@ -29,12 +30,12 @@ FORMAT = '%(asctime)-15s %(levelname)-8s %(message)s'
 
 logging.basicConfig(stream=sys.stdout, format=FORMAT)
 logging.captureWarnings(True)
-log = logging.getLogger(__name__)
+LOG = logging.getLogger(__name__)
 log_level = logging.getLevelName(os.getenv('LOG_LEVEL', 'INFO'))
-log.setLevel(log_level)
+LOG.setLevel(log_level)
 
-parser = argparse.ArgumentParser(description='Alphabot')
-parser.add_argument('--version', help='Show version and exit', dest='version',
+parser = argparse.ArgumentParser(description='betabot')
+parser.add_argument('-v', '--version', help='Show version and exit', dest='version',
                     action='store_true', default=False)
 parser.add_argument('-S', '--scripts', dest='scripts', metavar='dir',
                     action='store', default=[], nargs='+',
@@ -51,16 +52,20 @@ parser.add_argument('--no-web-app', dest='start_web_app', action='store_false',
 
 args = parser.parse_args()
 
-__author__ = ('Mikhail Simin <mikhail@nextdoor.com>',)
+__author__ = ('Nadja Rhodes <narhodes1+blog@gmail.com>',)
 __version__ = '0.0.1'
 
 
-async def start_alphabot():
-    bot = alphabot.bot.get_instance(engine=args.engine, start_web_app=args.start_web_app)
+async def start_betabot():
+    if args.version:
+        print(__version__)
+        exit()
+
+    bot = betabot.bots.bot.get_instance(engine=args.engine, start_web_app=args.start_web_app)
     memory = args.memory
 
     full_path_scripts = [os.path.abspath(s) for s in args.scripts]
-    log.debug('full path scripts: %s' % full_path_scripts)
+    LOG.debug('full path scripts: %s' % full_path_scripts)
     await bot.setup(memory_type=memory, script_paths=full_path_scripts)
     await bot.start()
 
@@ -70,16 +75,23 @@ def start_ioloop():
         loop = asyncio.get_event_loop()
         asyncio.set_event_loop(loop)
         loop.set_debug('DEBUG')
-        loop.run_until_complete(start_alphabot())
-    except KeyboardInterrupt:
-        log.info('CTRL-C Caught, shutting down')
-    except alphabot.bot.AlphaBotException as e:
-        log.critical('Alphabot failed. Reason: %s' % e)
+
+        for sig in (signal.SIGINT, signal.SIGTERM):
+            loop.add_signal_handler(sig, _ask_exit)
+
+        loop.run_until_complete(start_betabot())
+    except betabot.bots.bot.betabotException as e:
+        LOG.critical('betabot failed. Reason: %s' % e)
+
+
+def _ask_exit():
+    print()
+    LOG.info('CTRL-C Caught, shutting down')
+
+    for task in asyncio.Task.all_tasks():
+        task.cancel()
+    asyncio.ensure_future(exit())
 
 
 if __name__ == '__main__':
-    if args.version:
-        print(__version__)
-        exit()
-
     start_ioloop()

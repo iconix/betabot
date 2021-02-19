@@ -1,6 +1,6 @@
-FROM python:3-onbuild
+FROM python:3.8
 
-MAINTAINER Mikhail Simin
+LABEL maintainer="Nadja Rhodes"
 
 COPY ./ /app/
 

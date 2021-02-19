@@ -1,4 +1,10 @@
 *.pyc
 *.egg-info
 .DS_Store
+
+# ide
 .idea
+.vscode
+
+# venv
+.betabot

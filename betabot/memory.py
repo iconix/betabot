@@ -8,7 +8,7 @@ log = logging.getLogger(__name__)
 
 
 class Memory(object):
-    """Memory interface to Alphabot."""
+    """Memory interface to betabot."""
 
     async def save(self, key, value):
         # TODO: Add checks / hashing to prevent bad keys from breaking

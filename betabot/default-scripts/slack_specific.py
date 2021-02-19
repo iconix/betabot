@@ -3,9 +3,9 @@ import logging
 
 from tornado import web
 
-import alphabot.bot
+import betabot.bots.bot
 
-bot = alphabot.bot.get_instance()
+bot = betabot.bots.bot.get_instance()
 log = logging.getLogger(__name__)
 
 
@@ -53,5 +53,5 @@ async def add_handlers():
     log.info('Adding slack handlers')
     try:
         bot.add_web_handler(r'/slack-button-action', SlackButtonAction)
-    except alphabot.bot.WebApplicationNotAvailable:
+    except betabot.bots.bot.WebApplicationNotAvailable:
         log.error('Unable to add slack callback.')

@@ -4,20 +4,20 @@ from setuptools import setup, find_packages
 DIR = os.path.dirname(os.path.realpath(__file__))
 
 setup(
-    name = "alphabot",
+    name = "betabot",
     version = "0.0.1",
-    author = "Mikhail Simin",
-    author_email = "mikhail.simin@gmail.com",
+    author = "Nadja Rhodes",
+    author_email = "narhodes1+blog@gmail.com",
     description = ("Bot that connects to Slack."),
     license = "Apache License, Version 2.0",
     keywords = "slack, chat, irc, hubot",
-    url = "https://github.com/mikhail/alphabot",
+    url = "https://github.com/iconix/betabot",
     packages=find_packages(),
     long_description=open('%s/README.rst' % DIR).read(),
     install_requires=open('%s/requirements.txt' % DIR).readlines(),
     entry_points={
         'console_scripts': [
-            'alphabot = alphabot.app:start_ioloop'
+            'betabot = betabot.app:start_ioloop'
         ],
     },
     classifiers=[

@@ -1,10 +1,10 @@
 import time
 
-import alphabot.bot
+import betabot.bots.bot
 
 import logging
 
-bot = alphabot.bot.get_instance()
+bot = betabot.bots.bot.get_instance()
 log = logging.getLogger(__name__)
 
 START_TIME = time.time()
