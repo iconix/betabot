@@ -13,7 +13,7 @@ setup(
     keywords = "slack, chat, irc, hubot",
     url = "https://github.com/iconix/betabot",
     packages=find_packages(),
-    long_description=open('%s/README.rst' % DIR).read(),
+    long_description=open('%s/README.md' % DIR).read(),
     install_requires=open('%s/requirements.txt' % DIR).readlines(),
     entry_points={
         'console_scripts': [
