@@ -23,8 +23,6 @@ WEB_NO_SSL = os.getenv('WEB_NO_SSL', '') != ''
 WEB_PORT_SSL = int(os.getenv('WEB_PORT_SSL', 8443))
 
 LOG = logging.getLogger(__name__)
-log_level = logging.getLevelName(os.getenv('LOG_LEVEL', 'INFO'))
-LOG.setLevel(log_level)
 
 scheduler = AsyncIOScheduler()
 scheduler.start()

@@ -1,5 +1,4 @@
 import logging
-import os
 import re
 
 import asyncio
@@ -8,8 +7,6 @@ from betabot.bots.bot import Bot
 from betabot.channel import Channel
 
 LOG = logging.getLogger(__name__)
-log_level = logging.getLevelName(os.getenv('LOG_LEVEL', 'INFO'))
-LOG.setLevel(log_level)
 
 
 class Chat(object):

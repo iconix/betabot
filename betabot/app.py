@@ -1,24 +1,9 @@
 #!/usr/bin/env python
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-# http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-#
-# Copyright 2014 Nextdoor.com, Inc
-
 import argparse
 import asyncio
 import logging
 import os
 import signal
-import sys
 
 import requests
 
@@ -26,13 +11,7 @@ import betabot.bots.bot
 
 requests.packages.urllib3.disable_warnings()
 
-FORMAT = '%(asctime)-15s %(levelname)-8s %(message)s'
-
-logging.basicConfig(stream=sys.stdout, format=FORMAT)
-logging.captureWarnings(True)
 LOG = logging.getLogger(__name__)
-log_level = logging.getLevelName(os.getenv('LOG_LEVEL', 'INFO'))
-LOG.setLevel(log_level)
 
 parser = argparse.ArgumentParser(description='betabot')
 parser.add_argument('-v', '--version', help='Show version and exit', dest='version',

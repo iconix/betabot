@@ -10,8 +10,7 @@ from tornado import httpclient, websocket
 from betabot.bots.bot import Bot, CoreException, InvalidOptions, dict_subset
 
 LOG = logging.getLogger(__name__)
-log_level = logging.getLevelName(os.getenv('LOG_LEVEL', 'INFO'))
-LOG.setLevel(log_level)
+
 
 class BotSlack(Bot):
     engine = 'slack'

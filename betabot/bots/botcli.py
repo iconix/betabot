@@ -12,8 +12,7 @@ from betabot.channel import Channel
 from betabot.chat import Chat
 
 LOG = logging.getLogger(__name__)
-log_level = logging.getLevelName(os.getenv('LOG_LEVEL', 'INFO'))
-LOG.setLevel(log_level)
+
 
 class BotCLI(Bot):
 
