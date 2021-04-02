@@ -1,6 +1,6 @@
-*.pyc
+# python
+__pycache__
 *.egg-info
-.DS_Store
 
 # ide
 .idea
@@ -8,3 +8,6 @@
 
 # venv
 .betabot
+
+# shhh
+.env

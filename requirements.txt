@@ -1,6 +1,7 @@
 aiounittest
 apiai
 apscheduler==3.6.0
+python-dotenv
 mock
 nose==1.3.7
 pep8
