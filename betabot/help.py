@@ -1,6 +1,5 @@
-from __future__ import print_function
-
 import logging
+import re
 
 log = logging.getLogger(__name__)
 
@@ -11,6 +10,9 @@ class Help(object):
         self._func_map = {}
 
     def update(self, function, usage, tags=None, desc=''):
+        if isinstance(usage, re.Pattern):
+            usage = usage.pattern
+
         if not desc and function.__doc__:
             desc = function.__doc__
 

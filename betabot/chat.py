@@ -4,7 +4,7 @@ import re
 import asyncio
 
 from betabot.bots.bot import Bot
-from betabot.channel import Channel
+from betabot.classes import Channel
 
 LOG = logging.getLogger(__name__)
 
@@ -46,7 +46,7 @@ class Chat(object):
 
         match = re.match(f"^{regex}$", self.text, flags)
         if not match:
-            regex_name = f'^[\\s@<]*(?:{self.bot._user_name}|{self.bot._user_id})[>:,\\s]*'
+            regex_name = f'^[\\s@<]*(?:{self.bot._user}|{self.bot._user_id})[>:,\\s]*'
 
             starts_with_name = re.match(regex_name, self.text, flags)
             if starts_with_name:
@@ -62,16 +62,16 @@ class Chat(object):
         LOG.debug(f"Chat matched regex: {self.text} matched {regex}")
         return True
 
-    async def reply(self, text):
-        """Reply to the original channel of the message."""
-        # help hacks
-        # help fix direct messages
-        return await self.bot.send(text, to=self.channel.info.get('id'))
+    # async def reply(self, text):
+    #     """Reply to the original channel of the message."""
+    #     # help hacks
+    #     # help fix direct messages
+    #     return await self.bot.send(text, to=self.channel.info.get('id'))
 
-    async def reply_thread(self, text):
-        """Reply to the original channel of the message in a thread."""
-        return await self.bot.send(text, to=self.channel.info.get('id'),
-                                   extra={'thread_ts': self.raw.get('ts')})
+    # async def reply_thread(self, text):
+    #     """Reply to the original channel of the message in a thread."""
+    #     return await self.bot.send(text, to=self.channel.info.get('id'),
+    #                                extra={'thread_ts': self.raw.get('ts')})
 
     async def react(self, reaction):
         # TODO: self.bot.react(reaction, chat=self)

@@ -1,13 +1,19 @@
-import json
 import logging
-import os
 import random
-from urllib.parse import urlencode
 
 import asyncio
-from tornado import httpclient, websocket
+import dacite
+from slack_bolt.adapter.socket_mode.async_handler import AsyncSocketModeHandler
+from slack_bolt.async_app import AsyncApp
+from slack_sdk.errors import SlackApiError
 
-from betabot.bots.bot import Bot, CoreException, InvalidOptions, dict_subset
+from betabot.bots.bot import Bot, InvalidOptions, dict_subset
+from betabot.chat import Chat
+from betabot.classes import Channel
+from betabot import utility
+
+# TODO: allow these logs with a -vv verbose arg
+logging.getLogger('slack_bolt.AsyncApp').setLevel(logging.INFO)
 
 LOG = logging.getLogger(__name__)
 
@@ -16,50 +22,81 @@ class BotSlack(Bot):
     engine = 'slack'
     _too_fast_warning = False
 
-    async def _setup(self):
-        self._token = os.getenv('SLACK_TOKEN')
+    def __init__(self, start_web_app=False) -> None:
+        super().__init__(start_web_app)
 
-        if not self._token:
-            raise InvalidOptions('SLACK_TOKEN required for slack engine.')
+        self._bolt_app: AsyncApp = AsyncApp(
+            token=utility.get_bot_token(),
+            raise_error_for_unhandled_request=True
+        )
 
-        LOG.info('Authenticating...')
-        try:
-            response = await self.api('rtm.start')
-        except Exception as e:
-            raise CoreException('API call "rtm.start" to Slack failed: %s' % e)
+    async def setup(self, memory_type, script_paths):
+        await super().setup(memory_type, script_paths)
 
-        if response['ok']:
-            LOG.info('Logged in!')
-        else:
-            LOG.error('Login failed. Reason: "{}". Payload dump: {}'.format(
-                response.get('error', 'No error specified'), response))
-            raise InvalidOptions('Login failed')
+        app_token = utility.get_app_token()
+        if not app_token:
+            raise InvalidOptions('SLACK_APP_TOKEN required for slack engine.')
 
-        self.socket_url = response['url']
-        self.connection = await websocket.websocket_connect(self.socket_url)
+        self._handler = AsyncSocketModeHandler(self._bolt_app, app_token)
 
-        self._user_id = response['self']['id']
-        self._user_name = response['self']['name']
+        # TODO: dataclass the response: {'ok': True, 'url': 'https://asappinc.slack.com/', 'team': 'ASAPP', 'user': 'lil_ann', 'team_id': 'T02SZCJU2', 'user_id': 'U01HMBB9ZNV', 'bot_id': 'B01H5KMBBU5', 'is_enterprise_install': False}
+        identity = await self._bolt_app.client.auth_test()
+
+        self._bot_id = identity.data.get('bot_id')
+        self._user_id = identity.data.get('user_id')
+        self._user = identity.data.get('user')
 
         await self._update_channels()
         await self._update_users()
 
         self._too_fast_warning = False
 
+    async def start(self):
+        await super().start()
+
+        self._handler = AsyncSocketModeHandler(self._bolt_app, utility.get_app_token())
+        return await self._handler.start_async()
+
     def _get_user(self, uid) -> 'User':
-        match = [u for u in self._users if u['id'] == uid]
+        match = [u for u in self.users if u['id'] == uid]
         if match:
             return User(match[0])
 
     async def _update_users(self):
-        response = await self.api('users.list')
-        self._users = response['members']
+        # TODO: need `users:read`
+        try:
+            self.users = []
+            next_cursor = True
+            while next_cursor:
+                if next_cursor is True:
+                    next_cursor = ''
+
+                response = (await self._bolt_app.client.users_list(limit=1000, cursor=next_cursor)).data
+                self.users.extend(response.get('members'))
+                next_cursor = response.get('response_metadata', {}).get('next_cursor')
+        except SlackApiError as e:
+            LOG.warning(f'users_list: {e}')
+
+        LOG.info(f'bot loaded {len(self.users)} users')
 
     async def _update_channels(self):
-        response = await self.api('channels.list')
-        self._channels = response['channels']
-        response = await self.api('groups.list')
-        self._channels.extend(response['groups'])
+        try:
+            self.channels = {}
+            next_cursor = True
+            while next_cursor:
+                if next_cursor is True:
+                    next_cursor = ''
+
+                response = (await self._bolt_app.client.conversations_list(limit=1000, cursor=next_cursor)).data
+                self.channels = {**self.channels, **{c['id']: dacite.from_dict(Channel, c) for c in response.get('channels')}}
+                next_cursor = response.get('response_metadata', {}).get('next_cursor')
+        except SlackApiError as e:
+            LOG.warning(f'conversations_list: {e}')
+
+        LOG.info(f'bot loaded {len(self.channels)} channels')
+
+        # response = await self.api('groups.list')
+        # self.channels.extend(response['groups'])
 
     async def event_to_chat(self, message):
         channel = self.get_channel(id=message.get('channel'))
@@ -70,36 +107,19 @@ class BotSlack(Bot):
                     bot=self)
         return chat
 
-    async def _get_next_event(self):
-        """Slack-specific message reader.
+    # async def _get_next_event(self):
+    #     return await self._handler.start_async()
 
-        Returns a web event from the API listener if available, otherwise
-        waits for the slack streaming event.
-        """
+    # async def api(self, method, params=None):
+    #     client = httpclient.AsyncHTTPClient()
+    #     if not params:
+    #         params = {}
+    #     params.update({'token': self._token})
+    #     api_url = 'https://slack.com/api/%s' % method
 
-        if len(self._web_events):
-            event = self._web_events.pop()
-            return event
-
-        # TODO: rewrite this logic to use `on_message` feature of the socket
-        # FIXME: At the moment if there are 0 socket messages then web_events
-        #        will never be handled.
-        message = await self.connection.read_message()
-        LOG.debug('Slack message: "%s"' % message)
-        message = json.loads(message)
-
-        return message
-
-    async def api(self, method, params=None):
-        client = httpclient.AsyncHTTPClient()
-        if not params:
-            params = {}
-        params.update({'token': self._token})
-        api_url = 'https://slack.com/api/%s' % method
-
-        request = '%s?%s' % (api_url, urlencode(params))
-        response = await client.fetch(request=request)
-        return json.loads(response.body)
+    #     request = '%s?%s' % (api_url, urlencode(params))
+    #     response = await client.fetch(request=request)
+    #     return json.loads(response.body)
 
     async def send(self, text, to, extra=None):
         if extra is None:
@@ -110,7 +130,7 @@ class BotSlack(Bot):
         if self._too_fast_warning:
             await asyncio.sleep(2)
             self._too_fast_warning = False
-        await self.connection.write_message(json.dumps(payload))
+        # TODO: await self.connection.write_message(json.dumps(payload))
 
         confirmation_event = await self.wait_for_event(reply_to=id)
         confirmation_event.update({
@@ -119,8 +139,8 @@ class BotSlack(Bot):
         })
         return await self.event_to_chat(confirmation_event)
 
-    def get_channel(self, **kwargs):
-        match = [c for c in self._channels if dict_subset(c, kwargs)]
+    def get_channel(self, **kwargs) -> Channel:
+        match = [c for c in self.channels if dict_subset(c, kwargs)]
         if len(match) == 1:
             channel = Channel(bot=self, info=match[0])
             return channel
@@ -132,3 +152,6 @@ class BotSlack(Bot):
             return channel
 
         LOG.warning('Channel match for %s length %s' % (kwargs, len(match)))
+
+        channel = Channel(bot=self, info=kwargs)
+        return channel
