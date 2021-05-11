@@ -92,13 +92,9 @@ class HealthCheck(web.RequestHandler):
 
 class Bot(object):
     instance: Optional['Bot'] = None
-    #engine = 'default'
 
     def __init__(self, start_web_app=False):
-        #self.module_path = ''
         self.memory: memory.Memory = None
-        #self.event_listeners = []
-        #self._web_events = []
         self._on_start = []
 
         # TODO: self._bot_id?
@@ -135,29 +131,9 @@ class Bot(object):
             (r'/health', HealthCheck)
         ])
 
-    # def add_web_handler(self, path, handler):
-    #     """Adds a Handler to a web app.
-
-    #     Args:
-    #         path (string): Path where the handler should be served.
-    #         handler (web.RequestHandler): Handler to use.
-
-    #     Raises:
-    #         WebApplicationNotAvailable
-    #     """
-    #     if not self._web_app:
-    #         raise WebApplicationNotAvailable
-
-    #     self._web_app.add_handlers('.*', [(path, handler)])
-
     async def setup(self, memory_type, script_paths):
         await self._setup_memory(memory_type=memory_type)
-        #await self._setup()
         await self._setup_scripts(script_paths)
-
-    # def _setup(self):
-    #     """ engine-specific setup """
-    #     pass
 
     async def _setup_memory(self, memory_type='dict'):
 
@@ -177,7 +153,7 @@ class Bot(object):
         await self.memory.setup()
 
     async def _setup_scripts(self, script_paths=None):
-        # TODO: Add a flag to control these
+        # TODO: add a flag to control these
         default_path = Path(__file__).parents[1] / DEFAULT_SCRIPT_DIR
         LOG.info(f'loaded scripts: {self._import_scripts(str(default_path))}')
 
@@ -194,7 +170,6 @@ class Bot(object):
 
         results = []
         for importer, pkg_name, _ in pkgutil.iter_modules([dirname]):
-            #self.module_path = "%s/%s" % (dirname, pkg_name)
             LOG.debug(f'importing {pkg_name}')
             try:
                 importer.find_module(pkg_name).load_module(pkg_name)
@@ -206,24 +181,8 @@ class Bot(object):
                 traceback_string = StringIO()
                 traceback.print_exception(exc_type, exc_value, exc_traceback,
                                           file=traceback_string)
-                # asyncio.ensure_future(
-                #     self.send(
-                #         f'could not load `{pkg_name}` from {dirname}.',
-                #         DEBUG_CHANNEL)
-                # )
-
-                # asyncio.ensure_future(
-                #     self.send(traceback_string.getvalue(), DEBUG_CHANNEL)
-                # )
 
         return results
-
-    # def _event(self, payload):
-    #     LOG.info('adding an event on top of the stack: %s' % payload)
-    #     self._web_events.append(payload)
-
-    # async def _get_next_event(self):
-    #     pass
 
     async def start(self):
         if self._web_app:
@@ -258,47 +217,6 @@ class Bot(object):
 
         LOG.info('bot started! listening to events.')
 
-        # loop = asyncio.get_event_loop()
-        # #asyncio.set_event_loop(loop)
-        # loop.create_task(self._get_next_event())
-        # loop.run_forever()
-        # loop.close()
-
-        # while True:
-        #     event = await self._get_next_event()
-
-        #     LOG.debug('received event: %s' % event)
-        #     LOG.debug('checking against %s listeners' % len(self.event_listeners))
-
-        #     if event['text']:
-        #         if not self._classifier:
-        #             learn_map = []
-        #             for l in self._learn_map:
-        #                 learn_map.extend([(k, l[1]) for k in l[0]])
-        #             self._classifier = NaiveBayesClassifier(learn_map)
-
-        #         choices = self._classifier.prob_classify(event['text'])
-        #         func = choices.max()
-        #         prob = choices.prob(func)
-        #         LOG.debug(f'NLTK matched `{func.__name__}` function at {int(prob * 100)}%')
-        #         message = await self.event_to_chat(event)
-        #         min_prob = 0.65 if message.is_direct else 0.95
-        #         if prob > min_prob:
-        #             asyncio.ensure_future(func(message))
-        #             continue  # Do not loop through event listeners!
-
-        #     # Note: Copying the event_listeners list here to prevent
-        #     # mid-loop modification of the list.
-        #     for kwargs, func in list(self.event_listeners):
-        #         match = self._check_event_kwargs(event, kwargs)
-        #         LOG.debug('Function %s requires %s. Match: %s' % (
-        #             func.__name__, kwargs, match))
-        #         if match:
-        #             future = func(event=event)
-        #             asyncio.ensure_future(future)
-        #             # TODO: add a way to detect if any of these were "REAL" Match
-        #             #       then execute the NLP part if none matched.
-
     def _start_web_app(self):
         """Creates a web server on WEB_PORT and WEB_PORT_SSL"""
         if not self._web_app:
@@ -316,64 +234,9 @@ class Bot(object):
                 LOG.warning('failed to start SSL web app on %s. to disable - set WEB_NO_SSL',
                             WEB_PORT_SSL)
 
-    # async def wait_for_event(self, **event_args):
-    #     # Demented python scope.
-    #     # http://stackoverflow.com/questions/4851463/python-closure-write-to-variable-in-parent-scope
-    #     # This variable could be an object, but instead it's a single-element list.
-    #     event_matched = []
-
-    #     async def mark_true(event):
-    #         event_matched.append(event)
-
-    #     # TODO: dafuq is this all about??
-    #     LOG.info('Creating a temporary listener for %s' % (event_args,))
-    #     self.event_listeners.append((event_args, mark_true))
-
-    #     while not event_matched:
-    #         await asyncio.sleep(0.001)
-
-    #     LOG.info('Deleting the temporary listener for %s' % (event_args,))
-    #     self.event_listeners.remove((event_args, mark_true))
-
-    #     return event_matched[0]
-
-    # def add_listener(self, chat, **kwargs):
-    #     LOG.debug('Adding chat listener...')
-
-    #     async def cmd(event):
-    #         message = await self.event_to_chat(event)
-    #         asyncio.ensure_future(chat.hear(message))
-
-    #     # Uniquely identify this `cmd` to delete later.
-    #     cmd._listener_chat_id = id(chat)
-
-    #     if 'type' not in kwargs:
-    #         kwargs['type'] = 'message'
-
-    #     self._register_function(kwargs, cmd)
-
-    # def _remove_listener(self, chat):
-    #     match = None
-    #     # Have to search all the event_listeners here
-    #     for kw, cmd in self.event_listeners:
-    #         if (hasattr(cmd, '_listener_chat_id') and
-    #                 cmd._listener_chat_id == id(chat)):
-    #             match = (kw, cmd)
-    #     self.event_listeners.remove(match)
-
-    # def _check_event_kwargs(self, event, kwargs):
-    #     """Check that all expected kwargs were satisfied by the event."""
-    #     return dict_subset(event, kwargs)
-
-    # Decorators to be used in development of scripts
-
     def on_start(self, cmd):
         self._on_start.append(cmd)
         return cmd
-
-    # def _register_function(self, kwargs, cmd):
-    #     LOG.debug('New Listener: %s => %s()' % (kwargs, cmd.__name__))
-    #     self.event_listeners.append((kwargs, cmd))
 
     def on(self, event_type):
         """This decorator will invoke your function with the raw event."""
@@ -425,7 +288,6 @@ class Bot(object):
             # register some basic help using the regex
             self.help.update(cmd, regex)
 
-            #if direct:
             @self._bolt_app.message(regex)
             async def command_ack(
                 client: AsyncWebClient, request: AsyncBoltRequest, response: BoltResponse,
@@ -455,69 +317,8 @@ class Bot(object):
                     await cmd(event)
 
             return command_ack
-            # else:
-            #     @self._bolt_app.message(regex)
-            #     async def command_ack(
-            #         client: AsyncWebClient, request: AsyncBoltRequest, response: BoltResponse,
-            #         context: AsyncBoltContext, body: Dict[str, Any], payload: Dict[str, Any],
-            #         options: Optional[Dict[str, Any]], shortcut: Optional[Dict[str, Any]], action: Optional[Dict[str, Any]],
-            #         view: Optional[Dict[str, Any]], command: Optional[Dict[str, Any]], event: Optional[Dict[str, Any]],
-            #         message: Optional[Dict[str, Any]], ack: AsyncAck, say: AsyncSay, respond: AsyncRespond,
-            #         next: Callable[[], Awaitable[None]]
-            #     ):
-            #         '''
-            #         function signature derived from bolt's AsyncArgs:
-            #         https://github.com/slackapi/bolt-python/blob/8babac6c69e2ec2f5c7a24d9785438b80b4962c7/slack_bolt/kwargs_injection/async_args.py
-            #         '''
-            #         if utility.event_is_too_old(request.body.get('event_time', utility.get_timestamp()), request.body.get('event_id')):
-            #             return
-
-            #         # TODO: create a script interface based on Chat/Message/Event
-            #         event_actions = EventActions(ack=ack, say=say, respond=respond, next=next)
-            #         event_context = EventContext(client=client, request=request, response=response, context=context, bot=self)
-            #         event_data = EventData(body=body, payload=payload, options=options, shortcut=shortcut, action=action,
-            #             view=view, command=command, event=event, message=message)
-
-            #         event = Event(actions=event_actions, context=event_context, data=event_data)
-            #         found_match = event.match_regex(regex)
-
-            #         if found_match:
-            #             await cmd(event)
-
-            #     return command_ack
 
         return decorator
-
-        # """Will convert the raw event into a message object for your function."""
-
-        # def decorator(cmd):
-        #     # Register some basic help using the regex.
-        #     self.help.update(cmd, regex)
-
-        #     async def wrapper(request, event, say):
-        #         if utility.event_is_too_old(request.body.get('event_time', utility.get_timestamp()), request.body.get('event_id')):
-        #             return
-
-        #         message = await self.event_to_chat(event)
-        #         matches_regex = message.matches_regex(regex)
-        #         LOG.info(f'Command {cmd.__name__} should match the regex {regex}')
-        #         if not matches_regex:
-        #             return False
-
-        #         if direct and not message.is_direct:
-        #             return False
-
-        #         LOG.debug(f'Executing {cmd.__name__}')
-
-        #         await cmd(message=message, event=event, say=say, **message.regex_group_dict)
-        #         return True
-
-        #     wrapper.__name__ = 'wrapped:%s' % cmd.__name__
-
-        #     self._register_function({'type': 'message'}, wrapper)
-        #     return cmd
-
-        # return decorator
 
     def learn(self, sentences: List[str], direct=False):
         """Learn sentences for a command.
@@ -560,7 +361,7 @@ class Bot(object):
         """
 
         if 'second' not in schedule_keywords:
-            # Default is every second. We don't want that.
+            # default is every second. We don't want that.
             schedule_keywords['second'] = '0'
 
         def decorator(cmd):
@@ -572,7 +373,7 @@ class Bot(object):
 
         return decorator
 
-    # Functions that scripts can tell bot to execute.
+    # functions that scripts can tell bot to execute.
 
     async def event_to_chat(self, event) -> 'Chat':
         raise CoreException('Chat engine "%s" is missing event_to_chat(...)' % (
@@ -643,9 +444,9 @@ def handle_exceptions(future, chat):
             if chat:
                 chat.reply('Script had an error: %s ```%s```' % (e, traceback_string.getvalue()))
 
-    # Tornado functionality to add a custom callback
+    # tornado functionality to add a custom callback
     future.add_done_callback(cb)
 
 
 def dict_subset(big: dict, small: dict) -> bool:
-    return small.items() <= big.items()  # Python 3
+    return small.items() <= big.items()  # python 3

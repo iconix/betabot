@@ -12,10 +12,6 @@ from slack_bolt.response import BoltResponse
 
 from slack_sdk.web.async_client import AsyncWebClient
 
-
-#from betabot.bots.bot import Bot
-#from betabot.classes import Channel
-
 LOG = logging.getLogger(__name__)
 RE_FLAGS = flags = re.IGNORECASE
 
@@ -73,9 +69,6 @@ class Event(object):
         self.is_direct = False
         self._set_direct()
 
-        # self.listening = None
-        # self.heard_message = None
-
         self.regex_groups = None
         self.regex_group_dict = {}
 
@@ -106,7 +99,6 @@ class Event(object):
             self.is_direct = True
 
     def match_regex(self, regex: re.Pattern) -> bool:
-        #match = re.match(f"^{regex}$", self.text, RE_FLAGS)
         match = regex.search(self.text)
         if match:
             self.regex_groups = match.groups()

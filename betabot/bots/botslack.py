@@ -95,7 +95,7 @@ class BotSlack(Bot):
 
         LOG.info(f'bot loaded {len(self.channels)} channels')
 
-        # response = await self.api('groups.list')
+        # TODO: response = await self.api('groups.list')
         # self.channels.extend(response['groups'])
 
     async def event_to_chat(self, message):
@@ -106,20 +106,6 @@ class BotSlack(Bot):
                     raw=message,
                     bot=self)
         return chat
-
-    # async def _get_next_event(self):
-    #     return await self._handler.start_async()
-
-    # async def api(self, method, params=None):
-    #     client = httpclient.AsyncHTTPClient()
-    #     if not params:
-    #         params = {}
-    #     params.update({'token': self._token})
-    #     api_url = 'https://slack.com/api/%s' % method
-
-    #     request = '%s?%s' % (api_url, urlencode(params))
-    #     response = await client.fetch(request=request)
-    #     return json.loads(response.body)
 
     async def send(self, text, to, extra=None):
         if extra is None:
@@ -147,7 +133,7 @@ class BotSlack(Bot):
 
         # Super Hack!
         if kwargs.get('id') and kwargs['id'][0] == 'D':
-            # Direct message
+            # direct message
             channel = Channel(bot=self, info=kwargs)
             return channel
 

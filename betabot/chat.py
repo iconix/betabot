@@ -17,7 +17,7 @@ class Chat(object):
 
     def __init__(self, text: str, user: str, channel: Channel, raw: dict, bot: Bot):
         self.text = text
-        self.user = user  # TODO: Create a User() object
+        self.user = user  # TODO: use the User object
         self.channel = channel
         self.bot = bot
         self.raw = raw
@@ -61,17 +61,6 @@ class Chat(object):
             self.regex_group_dict = match.groupdict()
         LOG.debug(f"Chat matched regex: {self.text} matched {regex}")
         return True
-
-    # async def reply(self, text):
-    #     """Reply to the original channel of the message."""
-    #     # help hacks
-    #     # help fix direct messages
-    #     return await self.bot.send(text, to=self.channel.info.get('id'))
-
-    # async def reply_thread(self, text):
-    #     """Reply to the original channel of the message in a thread."""
-    #     return await self.bot.send(text, to=self.channel.info.get('id'),
-    #                                extra={'thread_ts': self.raw.get('ts')})
 
     async def react(self, reaction):
         # TODO: self.bot.react(reaction, chat=self)

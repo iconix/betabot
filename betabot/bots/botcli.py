@@ -32,7 +32,7 @@ class BotCLI(Bot):
         # TODO: User object?
         self._user = re.sub(r'\..*', '', sys.modules[__name__].__package__)
         self._user_id = 'U123'
-        #self._channel = Channel(self, {'id': 'CLI'})
+        # TODO: self._channel = Channel(self, {'id': 'CLI'}) ?
         self._channel = 'CLI'
         self._stdin = None
 
@@ -40,7 +40,6 @@ class BotCLI(Bot):
         await super().setup(memory_type, script_paths)
 
         asyncio.ensure_future(self._connect_stdin())
-        #self.connection = mock.Mock(name='ConnectionObject')
         asyncio.ensure_future(self._print_prompt())
 
     async def _connect_stdin(self):
@@ -62,27 +61,11 @@ class BotCLI(Bot):
         print(f'\033[4m{self._user}\033[0m> ', end='')
         sys.stdout.flush()
 
-    # async def api(self, method, params=None):
-    #     if not params:
-    #         params = {}
-    #     params.update({'token': self._token})
-    #     api_url = 'https://slack.com/api/%s' % method
-
-    #     request = '%s?%s' % (api_url, urlencode(params))
-    #     LOG.info('Would send an API request: %s' % request)
-    #     response = {
-    #         "ts": time.time()
-    #     }
-    #     return response
-
     async def start(self):
         await super().start()
 
         while True:
             event = await self._get_next_event()
-
-            #if event.type not in ('message', 'app_mention'):
-            #    return
 
             async def say(text: Union[str, dict], channel: Optional[str] = None, thread_ts: Optional[str] = None,):
                 add_whitespace = '\n' if '\n' in text else ' '
@@ -107,27 +90,9 @@ class BotCLI(Bot):
                     'say': say
                 }
             )
-            resp = await self._bolt_app.async_dispatch(req)
-
-            # if resp and resp.status == 404:
-            #     LOG.info(f'message handler not found. trying again as type:app_mention')
-            #     req: AsyncBoltRequest = AsyncBoltRequest(
-            #         mode='socket_mode',
-            #         body={
-            #             'event': {**event, **{'type': 'app_mention'}},
-            #             'type': 'event_callback'
-            #         },
-            #         context={
-            #             'say': say
-            #         }
-            #     )
-            #     resp = await self._bolt_app.async_dispatch(req)
+            await self._bolt_app.async_dispatch(req)
 
     async def _get_next_event(self):
-        # if len(self._web_events):
-        #     event = self._web_events.pop()
-        #     return event
-
         while not self._stdin:
             await asyncio.sleep(0.001)  # sleep(0) here eats all cpu
 
@@ -135,7 +100,6 @@ class BotCLI(Bot):
         self._stdin = None
 
         ts = str(datetime.now().timestamp())
-        #return Event(type='message', text=user_input, channel=self._channel, event_ts=event_ts)
         # https://api.slack.com/events/message
         return {
             'type': 'message',
@@ -146,18 +110,10 @@ class BotCLI(Bot):
             'ts': ts
         }
 
-    # async def event_to_chat(self, event) -> Chat:
-    #     return Chat(
-    #         text=event['text'],
-    #         user='User',
-    #         channel=self._channel,
-    #         raw=event,
-    #         bot=self)
-
     async def send(self, text, to, extra=None):
         print('\033[93m! betabot: \033[92m', text, '\033[0m')
         sys.stdout.flush()
-        await asyncio.sleep(0.01)  # Avoid BlockingIOError due to sync print above.
+        await asyncio.sleep(0.01)  # avoid BlockingIOError due to sync print above.
         return await self.event_to_chat({'text': text})
 
     def get_channel(self, name):
