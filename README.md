@@ -7,7 +7,7 @@
 <td><p><img src="images/logo.png" alt="image" /></p></td>
 <td><ul>
 <li>Open source Python bot to chat with Slack.</li>
-<li>Betabot is written for <a href="https://www.python.org/">Python 3</a> leveraging <code>asyncio</code> library with <code>async</code>/<code>await</code> patterns.</li>
+<li>Betabot is written for <a href="https://www.python.org/">Python 3</a> leveraging the <a href="https://github.com/slackapi/bolt-python"><code>Slack Bolt</code></a> bot framework.</li>
 </ul></td>
 </tr>
 </tbody>
