@@ -3,7 +3,6 @@ aiounittest
 apscheduler
 dacite
 python-dotenv
-mock
 nose  # unreferenced
 pytz  # unreferenced
 redis
