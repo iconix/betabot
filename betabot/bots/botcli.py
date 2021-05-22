@@ -1,6 +1,6 @@
 from datetime import datetime
 import logging
-import mock
+from unittest import mock
 import re
 import sys
 from typing import Optional, Union
@@ -22,13 +22,6 @@ class BotCLI(Bot):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-        mock_client = mock.Mock(spec=AsyncWebClient)
-        mock_client.token = 'xoxb-xxx'
-        self._bolt_app = AsyncApp(
-            client=mock_client,
-            raise_error_for_unhandled_request=True
-        )
-
         # TODO: User object?
         self._user = re.sub(r'\..*', '', sys.modules[__name__].__package__)
         self._user_id = 'U123'
@@ -41,6 +34,15 @@ class BotCLI(Bot):
 
         asyncio.ensure_future(self._connect_stdin())
         asyncio.ensure_future(self._print_prompt())
+
+    async def _setup(self):
+        mock_client = mock.Mock(spec=AsyncWebClient)
+        mock_client.token = 'xoxb-xxx'
+        self._bolt_app = AsyncApp(
+            client=mock_client,
+            raise_error_for_unhandled_request=True
+        )
+        self.client = mock_client
 
     async def _connect_stdin(self):
         loop = asyncio.get_running_loop()

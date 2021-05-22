@@ -6,6 +6,7 @@ import dacite
 from slack_bolt.adapter.socket_mode.async_handler import AsyncSocketModeHandler
 from slack_bolt.async_app import AsyncApp
 from slack_sdk.errors import SlackApiError
+from slack_sdk.web.async_client import AsyncWebClient
 
 from betabot.bots.bot import Bot, InvalidOptions, dict_subset
 from betabot.chat import Chat
@@ -24,11 +25,6 @@ class BotSlack(Bot):
 
     def __init__(self, start_web_app=False) -> None:
         super().__init__(start_web_app)
-
-        self._bolt_app: AsyncApp = AsyncApp(
-            token=utility.get_bot_token(),
-            raise_error_for_unhandled_request=True
-        )
 
     async def setup(self, memory_type, script_paths):
         await super().setup(memory_type, script_paths)
@@ -56,6 +52,13 @@ class BotSlack(Bot):
 
         self._handler = AsyncSocketModeHandler(self._bolt_app, utility.get_app_token())
         return await self._handler.start_async()
+
+    async def _setup(self):
+        self._bolt_app: AsyncApp = AsyncApp(
+            token=utility.get_bot_token(),
+            raise_error_for_unhandled_request=True
+        )
+        self.client: AsyncWebClient = self._bolt_app.client
 
     def _get_user(self, uid) -> 'User':
         match = [u for u in self.users if u['id'] == uid]

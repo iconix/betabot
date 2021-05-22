@@ -11,6 +11,7 @@ import traceback
 from typing import Any, Awaitable, Callable, Dict, List, Optional, Tuple, Union
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from dotenv import load_dotenv
 from slack_bolt.async_app import AsyncApp
 from slack_bolt.context.ack.async_ack import AsyncAck
 from slack_bolt.context.async_context import AsyncBoltContext
@@ -26,6 +27,7 @@ from tornado import web
 from betabot import help
 from betabot import memory
 from betabot import utility
+from betabot.classes import Channel
 from betabot.classes.event import Event, EventActions, EventContext, EventData
 
 # TODO: allow these logs with a -vv verbose arg
@@ -101,9 +103,6 @@ class Bot(object):
         self._user_id = ''
         self._user = ''
 
-        # TODO: support both channel id and name
-        self._test_channel = utility.get_env_var('TEST_CHANNEL', '')
-
         self.help = help.Help()
 
         self._learn_map: List[Tuple[List[str], 'function']] = []  # saves all sentences to learn for a function
@@ -113,6 +112,7 @@ class Bot(object):
         # should eventually cut this dependency on slack-bolt
         # TODO: subclass off of AsyncApp (and other bolt components) instead? or create an ABC
         self._bolt_app: Optional[AsyncApp] = None
+        self.client: Optional[AsyncWebClient] = None
 
         self._web_app = None
         if start_web_app:
@@ -132,8 +132,27 @@ class Bot(object):
         ])
 
     async def setup(self, memory_type, script_paths):
+        await self._setup_env(script_paths)
+        await self._setup()  # engine-specific setup
         await self._setup_memory(memory_type=memory_type)
         await self._setup_scripts(script_paths)
+
+    async def _setup_env(self, script_paths):
+        for script_path in script_paths:
+            # load env vars included with any scripts (n.b., on duplicates, last wins)
+            dotenv_path = f'{script_path}/.env'
+            if os.path.exists(dotenv_path):
+                load_dotenv(dotenv_path=dotenv_path, verbose=True, override=True)
+                LOG.info(f'loaded env vars from {script_path}')
+
+        self.test_channel = None
+        test_channel = utility.get_env_var('TEST_CHANNEL_ID', '')
+        if test_channel:
+            self.test_channel = Channel(id=test_channel)
+            LOG.info(f'using test channel {self.test_channel}')
+
+    async def _setup(self):
+        pass
 
     async def _setup_memory(self, memory_type='dict'):
 
@@ -160,8 +179,8 @@ class Bot(object):
         if not script_paths:
             LOG.warning('no scripts specified for import')
         else:
-            for path in script_paths:
-                LOG.info(f'loaded scripts: {self._import_scripts(path)}')
+            for script_path in script_paths:
+                LOG.info(f'loaded scripts: {self._import_scripts(script_path)}')
 
     def _import_scripts(self, dirname) -> List[str]:
         LOG.info(f'importing scripts from {dirname}')
