@@ -1,18 +1,21 @@
 import os
 from setuptools import setup, find_packages
 
+from betabot.version import __version__
+
 DIR = os.path.dirname(os.path.realpath(__file__))
 
 setup(
     name = "betabot",
-    version = "0.0.1",
+    version = __version__,
     author = "Nadja Rhodes",
     author_email = "narhodes1+blog@gmail.com",
     description = ("Bot that connects to Slack."),
     license = "Apache License, Version 2.0",
-    keywords = "slack, chat, irc, hubot",
+    keywords = "slack, chat, irc, hubot, alphabot",
     url = "https://github.com/iconix/betabot",
-    packages=find_packages(),
+    packages=find_packages(),  # TODO: PEP420PackageFinder.find ?
+    python_requires='>=3.8',
     long_description=open('%s/README.md' % DIR).read(),
     install_requires=open('%s/requirements.txt' % DIR).readlines(),
     entry_points={

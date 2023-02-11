@@ -4,7 +4,7 @@ import betabot.bots.bot
 # invoked inside of a script-discovery code of the bot itself!
 bot = betabot.bots.bot.get_instance()
 
-
+# TODO: busted somehow
 @bot.on_schedule(minute='0')
 async def still_here():
     channel = bot.get_channel(name='betabot-debug')

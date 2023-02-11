@@ -7,8 +7,9 @@ from typing import Optional, Union
 
 import asyncio
 from slack_bolt.async_app import AsyncApp
+from slack_bolt.middleware.authorization.async_authorization import AsyncAuthorization
 from slack_bolt.request.async_request import AsyncBoltRequest
-from slack_sdk.web.async_client import AsyncWebClient
+from slack_sdk.web.async_client import AsyncBaseClient, AsyncWebClient
 
 from betabot.bots.bot import Bot
 
@@ -32,16 +33,36 @@ class BotCLI(Bot):
     async def setup(self, memory_type, script_paths):
         await super().setup(memory_type, script_paths)
 
+        self.channels = {
+            self._channel: Channel(self, {'id': self._channel})
+        }
+        self.users = [self._user_id]
+
         asyncio.ensure_future(self._connect_stdin())
         asyncio.ensure_future(self._print_prompt())
 
     async def _setup(self):
         mock_client = mock.Mock(spec=AsyncWebClient)
         mock_client.token = 'xoxb-xxx'
+        mock_client.base_url = AsyncBaseClient.BASE_URL
+        mock_client.timeout = 30
+        mock_client.ssl = None
+        mock_client.proxy = None
+        mock_client.session = None
+        mock_client.trust_env_in_session = False
+        mock_client.headers = None
+        mock_client.retry_handlers = None
+
         self._bolt_app = AsyncApp(
             client=mock_client,
             raise_error_for_unhandled_request=True
         )
+        # disable auth
+        self._bolt_app._async_middleware_list = [
+            m for m in self._bolt_app._async_middleware_list
+            if not isinstance(m, AsyncAuthorization)
+        ]
+
         self.client = mock_client
 
     async def _connect_stdin(self):
