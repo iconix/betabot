@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 import argparse
 import asyncio
 import logging
@@ -8,6 +7,7 @@ import signal
 import requests
 
 import betabot.bots.bot
+from betabot.version import __version__
 
 requests.packages.urllib3.disable_warnings()
 
@@ -25,19 +25,16 @@ parser.add_argument('-e', '--engine', dest='engine', action='store',
 parser.add_argument('-m', '--memory', dest='memory', action='store',
                     default='dict', help='What persistent storage to use.')
 
-# NOTE: Since the variable is start_web_app, it does actually default True.
+# n.b., if --no-web-app is present, start_web_app is False
 parser.add_argument('--no-web-app', dest='start_web_app', action='store_false',
                     default=True, help='Do not run the web server.')
 
 args = parser.parse_args()
 
-__author__ = ('Nadja Rhodes <narhodes1+blog@gmail.com>',)
-__version__ = '0.0.1'
-
 
 async def start_betabot():
     if args.version:
-        print(__version__)
+        LOG.info(f"version {__version__}")
         exit()
 
     bot = betabot.bots.bot.get_instance(engine=args.engine, start_web_app=args.start_web_app)
@@ -51,23 +48,30 @@ async def start_betabot():
 
 def start_ioloop():
     try:
+        level_msg = f'log level is {logging.getLevelName(LOG.getEffectiveLevel())}'
+        if LOG.getEffectiveLevel() > logging.INFO:
+            print(level_msg)
+        else:
+            LOG.info(level_msg)
+
+        LOG.info('starting ioloop')
         loop = asyncio.get_event_loop()
         asyncio.set_event_loop(loop)
-        loop.set_debug('DEBUG')
+        loop.set_debug(LOG.getEffectiveLevel() == logging.DEBUG)
 
         for sig in (signal.SIGINT, signal.SIGTERM):
-            loop.add_signal_handler(sig, _ask_exit)
+            loop.add_signal_handler(sig, _terminate)
 
         loop.run_until_complete(start_betabot())
     except betabot.bots.bot.betabotException as e:
         LOG.critical('betabot failed. Reason: %s' % e)
 
 
-def _ask_exit():
+def _terminate():
     print()
-    LOG.info('CTRL-C Caught, shutting down')
+    LOG.info('ctrl-c caught, shutting down')
 
-    for task in asyncio.Task.all_tasks():
+    for task in asyncio.all_tasks():
         task.cancel()
     asyncio.ensure_future(exit())
 

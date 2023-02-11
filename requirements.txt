@@ -1,13 +1,12 @@
+aiohttp  # used by slack_bolt (AsyncApp)
 aiounittest
-apiai
-apscheduler==3.6.0
+apscheduler
+dacite
 python-dotenv
-mock
-nose==1.3.7
-pep8
-pyflakes
-pytz
+nose  # unreferenced
+pytz  # unreferenced
 redis
 requests
+slack_bolt
 textblob
 tornado

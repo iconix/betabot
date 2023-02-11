@@ -17,7 +17,7 @@ class TestException(Exception):
 class TestWebApp(aiounittest.AsyncTestCase):
     def get_app(self):
         bot = AB.get_instance(start_web_app=True)
-        return bot.make_web_app()
+        return bot._make_web_app()
 
     async def _test_healthz(self):
         response = self.fetch('/health_check')
