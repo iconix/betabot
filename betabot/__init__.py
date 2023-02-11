@@ -1,11 +1,9 @@
 import logging
 import os
 
-try:
-    import dotenv
-    dotenv.load_dotenv(verbose=True)  # load .env vars
-except ImportError:
-    pass
+from dotenv import load_dotenv
+
+load_dotenv(verbose=True)  # load .env vars
 
 logging.basicConfig(
     level=os.getenv('LOG_LEVEL', 'INFO'),

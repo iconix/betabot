@@ -1,13 +1,11 @@
 import os
 from setuptools import setup, find_packages
 
-from betabot.version import __version__
-
 DIR = os.path.dirname(os.path.realpath(__file__))
 
 setup(
     name = "betabot",
-    version = __version__,
+    version = "0.1.0",
     author = "Nadja Rhodes",
     author_email = "narhodes1+blog@gmail.com",
     description = ("Bot that connects to Slack."),

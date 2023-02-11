@@ -1,8 +1,6 @@
 from unittest import mock
 from tornado import gen
 
-__author__ = 'Nadja Rhodes <narhodes1+blog@gmail.com>'
-
 
 def mock_tornado(*args, **kwargs):
     m = mock.Mock(*args, **kwargs)

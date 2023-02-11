@@ -7,6 +7,7 @@ import signal
 import requests
 
 import betabot.bots.bot
+from betabot.version import __version__
 
 requests.packages.urllib3.disable_warnings()
 
@@ -30,13 +31,10 @@ parser.add_argument('--no-web-app', dest='start_web_app', action='store_false',
 
 args = parser.parse_args()
 
-__author__ = ('Nadja Rhodes <narhodes1+blog@gmail.com>',)
-__version__ = '0.0.1'
-
 
 async def start_betabot():
     if args.version:
-        print(__version__)
+        LOG.info(f"version {__version__}")
         exit()
 
     bot = betabot.bots.bot.get_instance(engine=args.engine, start_web_app=args.start_web_app)
