@@ -134,7 +134,7 @@ class BotCLI(Bot):
         }
 
     async def send(self, text, to, extra=None):
-        print('\033[93m! betabot: \033[92m', text, '\033[0m')
+        print(f'\033[93m! {self._user}: \033[92m', text, '\033[0m')
         sys.stdout.flush()
         await asyncio.sleep(0.01)  # avoid BlockingIOError due to sync print above.
         return await self.event_to_chat({'text': text})
