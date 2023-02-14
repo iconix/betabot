@@ -223,6 +223,7 @@ class Bot(object):
             # to @bot messages
             if event.get('type') == 'app_mention':
                 event['type'] = 'message'
+                event['subtype'] = 'app_mention'
             await next()
 
         @self._bolt_app.error

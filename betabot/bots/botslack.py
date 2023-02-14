@@ -96,7 +96,8 @@ class BotSlack(Bot):
         except SlackApiError as e:
             LOG.warning(f'conversations_list: {e}')
 
-        LOG.info(f'bot loaded {len(self.channels)} channels')
+        # n.b., this also includes archived channels
+        LOG.info(f"bot loaded {len(self.channels)} channels")
 
         # TODO: response = await self.api('groups.list')
         # self.channels.extend(response['groups'])
