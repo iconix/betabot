@@ -215,7 +215,7 @@ class Bot(object):
 
         @self._bolt_app.use
         async def log_incoming(logger: Logger, payload: Dict[str, Any], next: Callable[[], Awaitable[None]]):
-            logger.info(f'{payload}')
+            logger.debug(f'{payload}')
             await next()  # pass control to the next middleware
 
         @self._bolt_app.use
