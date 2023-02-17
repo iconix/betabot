@@ -17,6 +17,9 @@ from betabot.classes import Channel
 
 LOG = logging.getLogger(__name__)
 
+BOT_CHANNEL = 'CLI'
+BOT_USER = 'U123'
+
 
 class BotCLI(Bot):
 
@@ -25,9 +28,9 @@ class BotCLI(Bot):
 
         # TODO: User object?
         self._user = re.sub(r'\..*', '', sys.modules[__name__].__package__)
-        self._user_id = 'U123'
+        self._user_id = BOT_USER
         # TODO: self._channel = Channel(self, {'id': 'CLI'}) ?
-        self._channel = 'CLI'
+        self._channel = BOT_CHANNEL
         self._stdin = None
 
     async def setup(self, memory_type, script_paths):
